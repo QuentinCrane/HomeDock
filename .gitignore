@@ -1,0 +1,46 @@
+# ===========================
+# Personal Base Project
+# ===========================
+
+# Dependencies
+web-base/node_modules/
+web-base/dist/
+web-base/dist-ssr/
+
+# Build outputs
+android-terminal/.gradle/
+android-terminal/build/
+android-terminal/app/build/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.DS_Store
+
+# Logs
+*.log
+logs/
+
+# Runtime data
+database.sqlite
+uploads/
+
+# Playwright test artifacts
+.playwright-mcp/
+
+# Cleanup candidates (review before deletion)
+_cleanup_candidates/
+
+# Environment
+.env
+.env.local
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*~
+# local for dev
+AGENTS.md
+tempdocs/
