@@ -55,7 +55,9 @@ import kotlinx.coroutines.delay
 @Composable
 fun SettingsScreen(
     viewModel: MainViewModel,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isDarkTheme: Boolean = true,
+    onToggleTheme: (() -> Unit)? = null
 ) {
     val baseIp by viewModel.baseIp.collectAsState()
     val todoSyncState by viewModel.todoSyncState.collectAsState()
@@ -63,16 +65,21 @@ fun SettingsScreen(
     var manualIpInput by remember { mutableStateOf("") }
     var showIpDialog by remember { mutableStateOf(false) }
 
-    // Settings state
-    var autoDiscoverBase by remember { mutableStateOf(true) }
-    var silentMode by remember { mutableStateOf(false) }
-    var animationIntensity by remember { mutableStateOf("full") } // "full", "light", "minimal"
-    var hapticFeedback by remember { mutableStateOf(true) }
-    var soundFeedback by remember { mutableStateOf(true) }
-    var autoSaveDraft by remember { mutableStateOf(true) }
-    var imageCompression by remember { mutableStateOf(true) }
-    var recordingQuality by remember { mutableStateOf("high") } // "high", "medium", "low"
-    var syncRetryStrategy by remember { mutableStateOf("3") } // "1", "3", "5", "infinite"
+    // Settings state from ViewModel
+    val hapticFeedback by viewModel.hapticEnabled.collectAsState()
+    val soundFeedback by viewModel.soundEnabled.collectAsState()
+    val animationIntensity by viewModel.animationIntensity.collectAsState()
+    val autoSaveDraft by viewModel.autoSaveDraft.collectAsState()
+    val imageCompression by viewModel.imageCompression.collectAsState()
+    val recordingQuality by viewModel.recordingQuality.collectAsState()
+    val autoDiscoverBase by viewModel.autoDiscoverBase.collectAsState()
+    val syncRetryStrategy by viewModel.syncRetryStrategy.collectAsState()
+    val silentMode by viewModel.silentMode.collectAsState()
+    
+    // 颜色定制状态
+    val primaryColor by viewModel.primaryColor.collectAsState()
+    val secondaryColor by viewModel.secondaryColor.collectAsState()
+    val borderRadius by viewModel.borderRadius.collectAsState()
 
     // Screen launch animation
     var screenVisible by remember { mutableStateOf(false) }
@@ -139,7 +146,7 @@ fun SettingsScreen(
                         title = "自动发现基地",
                         subtitle = "通过 mDNS 广播自动搜索主基地",
                         isChecked = autoDiscoverBase,
-                        onCheckedChange = { autoDiscoverBase = it }
+                        onCheckedChange = { viewModel.setAutoDiscoverBase(it) }
                     )
 
                     Spacer(modifier = Modifier.height(12.dp))
@@ -151,18 +158,18 @@ fun SettingsScreen(
                         subtitle = "同步失败时的最大重试次数",
                         options = listOf("1", "3", "5", "∞"),
                         selectedOption = syncRetryStrategy,
-                        onOptionSelected = { syncRetryStrategy = it }
+                        onOptionSelected = { viewModel.setSyncRetryStrategy(it) }
                     )
 
                     Spacer(modifier = Modifier.height(8.dp))
 
                     // Manual IP input hint
                     Surface(
-                        shape = RoundedCornerShape(4.dp),
+                        shape = MaterialTheme.shapes.small,
                         color = MaterialTheme.colorScheme.surface,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .border(1.dp, Color(0xFF2A2E37), RoundedCornerShape(4.dp))
+                            .border(1.dp, Color(0xFF2A2E37), MaterialTheme.shapes.small)
                     ) {
                         Row(
                             modifier = Modifier.padding(12.dp),
@@ -197,7 +204,7 @@ fun SettingsScreen(
                         title = "静音模式",
                         subtitle = "关闭所有声音和提示音",
                         isChecked = silentMode,
-                        onCheckedChange = { silentMode = it }
+                        onCheckedChange = { viewModel.setSilentMode(it) }
                     )
 
                     Spacer(modifier = Modifier.height(8.dp))
@@ -209,7 +216,7 @@ fun SettingsScreen(
                         subtitle = "界面动画的复杂程度",
                         options = listOf("完整", "轻量", "极简"),
                         selectedOption = animationIntensity,
-                        onOptionSelected = { animationIntensity = it }
+                        onOptionSelected = { viewModel.setAnimationIntensity(it) }
                     )
 
                     Spacer(modifier = Modifier.height(8.dp))
@@ -262,7 +269,7 @@ fun SettingsScreen(
                         title = "触感反馈",
                         subtitle = "按钮和交互的振动反馈",
                         isChecked = hapticFeedback,
-                        onCheckedChange = { hapticFeedback = it }
+                        onCheckedChange = { viewModel.setHapticEnabled(it) }
                     )
 
                     Spacer(modifier = Modifier.height(8.dp))
@@ -273,14 +280,52 @@ fun SettingsScreen(
                         title = "声音反馈",
                         subtitle = "操作成功或失败的提示音",
                         isChecked = soundFeedback,
-                        onCheckedChange = { soundFeedback = it }
+                        onCheckedChange = { viewModel.setSoundEnabled(it) }
+                    )
+                    
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Dark mode toggle
+                    SettingsToggleItem(
+                        icon = if (isDarkTheme) Icons.Default.DarkMode else Icons.Default.LightMode,
+                        title = "深色模式",
+                        subtitle = if (isDarkTheme) "当前：深色主题" else "当前：浅色主题",
+                        isChecked = isDarkTheme,
+                        onCheckedChange = { onToggleTheme?.invoke() }
                     )
                 }
 
                 Spacer(modifier = Modifier.height(24.dp))
 
                 // =================================================================
-                // SECTION 3: CONTENT (内容)
+                // SECTION 3: COLOR CUSTOMIZATION (颜色定制)
+                // =================================================================
+                SettingsSection(title = "颜色定制") {
+                    Surface(
+                        shape = RoundedCornerShape(4.dp),
+                        color = MaterialTheme.colorScheme.surface,
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF2A2E37)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(12.dp)
+                        ) {
+                            ColorCustomizationSection(
+                                primaryColor = primaryColor,
+                                onPrimaryColorChange = { viewModel.setPrimaryColor(it) },
+                                secondaryColor = secondaryColor,
+                                onSecondaryColorChange = { viewModel.setSecondaryColor(it) },
+                                borderRadius = borderRadius,
+                                onBorderRadiusChange = { viewModel.setBorderRadius(it) }
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                // =================================================================
+                // SECTION 4: CONTENT (内容)
                 // =================================================================
                 SettingsSection(title = "内容") {
                     // Auto-save draft toggle
@@ -289,7 +334,7 @@ fun SettingsScreen(
                         title = "自动保存草稿",
                         subtitle = "创建胶囊时自动保存为草稿",
                         isChecked = autoSaveDraft,
-                        onCheckedChange = { autoSaveDraft = it }
+                        onCheckedChange = { viewModel.setAutoSaveDraft(it) }
                     )
 
                     Spacer(modifier = Modifier.height(8.dp))
@@ -300,7 +345,7 @@ fun SettingsScreen(
                         title = "图片压缩",
                         subtitle = "上传前压缩图片以节省流量",
                         isChecked = imageCompression,
-                        onCheckedChange = { imageCompression = it }
+                        onCheckedChange = { viewModel.setImageCompression(it) }
                     )
 
                     Spacer(modifier = Modifier.height(12.dp))
@@ -312,7 +357,7 @@ fun SettingsScreen(
                         subtitle = "音频录制的质量等级",
                         options = listOf("高", "中", "低"),
                         selectedOption = recordingQuality,
-                        onOptionSelected = { recordingQuality = it }
+                        onOptionSelected = { viewModel.setRecordingQuality(it) }
                     )
 
                     Spacer(modifier = Modifier.height(8.dp))
@@ -338,8 +383,8 @@ fun SettingsScreen(
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
                                 text = when (recordingQuality) {
-                                    "high" -> "高质量: 128kbps, ~1MB/分钟"
-                                    "medium" -> "中质量: 64kbps, ~500KB/分钟"
+                                    "高" -> "高质量: 128kbps, ~1MB/分钟"
+                                    "中" -> "中质量: 64kbps, ~500KB/分钟"
                                     else -> "低质量: 32kbps, ~250KB/分钟"
                                 },
                                 fontFamily = FontFamily.Monospace,
@@ -415,7 +460,7 @@ fun SettingsScreen(
                 currentIp = baseIp,
                 onDismiss = { showIpDialog = false },
                 onConfirm = { ip ->
-                    // Would call viewModel.setManualIp(ip) in full implementation
+                    viewModel.setManualIp(ip)
                     showIpDialog = false
                 }
             )
@@ -1038,4 +1083,235 @@ private fun ManualIpDialog(
             }
         }
     )
+}
+
+// ============================================================================
+// COLOR PICKER - 颜色选择器
+// 
+// 功能说明：
+// - 显示预设颜色选项供用户选择
+// - 点击可选中对应颜色
+// 
+// 视觉布局：
+// - 圆形颜色块排列成一行
+// - 选中状态：白色边框 + 缩放 1.1
+// - 未选中状态：无边框
+// 
+// 预设颜色：
+// - 蓝色、绿色、红色、黄色、紫色、粉色、青色、橙色
+// 
+// 关键属性：
+// - selectedColor：当前选中的颜色值
+// - onColorSelected：颜色变化回调
+// - presetColors：预设颜色列表
+// 
+// 用户交互：
+// - 点击颜色块：触发 onColorSelected
+// ============================================================================
+
+@Composable
+private fun ColorPicker(
+    selectedColor: Int,
+    onColorSelected: (Int) -> Unit,
+    presetColors: List<Int> = listOf(
+        0xFF3B82F6.toInt(), // Blue
+        0xFF10B981.toInt(), // Green
+        0xFFEF4444.toInt(), // Red
+        0xFFF59E0B.toInt(), // Yellow
+        0xFF8B5CF6.toInt(), // Purple
+        0xFFEC4899.toInt(), // Pink
+        0xFF06B6D4.toInt(), // Cyan
+        0xFFF97316.toInt()  // Orange
+    )
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        presetColors.forEach { color ->
+            val isSelected = selectedColor == color
+            val scale = if (isSelected) 1.1f else 1f
+            
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .scale(scale)
+                    .background(
+                        color = Color(color),
+                        shape = androidx.compose.foundation.shape.CircleShape
+                    )
+                    .then(
+                        if (isSelected) {
+                            Modifier.border(
+                                width = 2.dp,
+                                color = Color.White,
+                                shape = androidx.compose.foundation.shape.CircleShape
+                            )
+                        } else {
+                            Modifier
+                        }
+                    )
+                    .clickable { onColorSelected(color) }
+            )
+        }
+    }
+}
+
+// ============================================================================
+// BORDER RADIUS SELECTOR - 圆角选择器
+// 
+// 功能说明：
+// - 分段按钮样式选择圆角值
+// - 可选值：4dp, 8dp, 12dp, 16dp
+// 
+// 视觉布局：
+// - 等宽排列的分段按钮
+// - 选中：主题色背景（20%）+ 主题色边框（50%）+ 主题色文字
+// - 未选中：透明背景 + 深灰边框 + 灰色文字
+// 
+// 关键属性：
+// - selectedRadius：当前选中的圆角值
+// - onRadiusSelected：圆角变化回调
+// 
+// 用户交互：
+// - 点击分段按钮：触发 onRadiusSelected
+// ============================================================================
+
+@Composable
+private fun BorderRadiusSelector(
+    selectedRadius: Int,
+    onRadiusSelected: (Int) -> Unit,
+    primaryColor: Int,
+    options: List<Int> = listOf(4, 8, 12, 16)
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        options.forEach { radius ->
+            val isSelected = selectedRadius == radius
+            val backgroundColor = if (isSelected) {
+                Color(primaryColor).copy(alpha = 0.2f)
+            } else {
+                MaterialTheme.colorScheme.background
+            }
+            
+            val borderColor = if (isSelected) {
+                Color(primaryColor).copy(alpha = 0.5f)
+            } else {
+                Color(0xFF2A2E37)
+            }
+            
+            val textColor = if (isSelected) {
+                Color(primaryColor)
+            } else {
+                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+            }
+            
+            Surface(
+                shape = RoundedCornerShape(4.dp),
+                color = backgroundColor,
+                border = androidx.compose.foundation.BorderStroke(1.dp, borderColor),
+                modifier = Modifier
+                    .weight(1f)
+                    .clickable { onRadiusSelected(radius) }
+            ) {
+                Text(
+                    text = "${radius}dp",
+                    fontFamily = FontFamily.Monospace,
+                    color = textColor,
+                    fontSize = 12.sp,
+                    modifier = Modifier
+                        .padding(horizontal = 8.dp, vertical = 8.dp)
+                        .fillMaxWidth(),
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                )
+            }
+        }
+    }
+}
+
+// ============================================================================
+// COLOR CUSTOMIZATION SECTION - 颜色定制区块
+// 
+// 功能说明：
+// - 包含主色和副色选择器
+// - 包含圆角选择器
+// 
+// 视觉布局：
+// - 主色选择器 + 说明文字
+// - 副色选择器 + 说明文字
+// - 圆角选择器 + 说明文字
+// 
+// 关键属性：
+// - primaryColor：当前主色
+// - onPrimaryColorChange：主色变化回调
+// - secondaryColor：当前副色
+// - onSecondaryColorChange：副色变化回调
+// - borderRadius：当前圆角值
+// - onBorderRadiusChange：圆角变化回调
+// 
+// 用户交互：
+// - 点击颜色块：触发对应变化回调
+// - 点击圆角按钮：触发圆角变化回调
+// ============================================================================
+
+@Composable
+private fun ColorCustomizationSection(
+    primaryColor: Int,
+    onPrimaryColorChange: (Int) -> Unit,
+    secondaryColor: Int,
+    onSecondaryColorChange: (Int) -> Unit,
+    borderRadius: Int,
+    onBorderRadiusChange: (Int) -> Unit
+) {
+    // 主色选择器
+    Column {
+        Text(
+            text = "主色",
+            fontFamily = FontFamily.Monospace,
+            color = MaterialTheme.colorScheme.onSurface,
+            fontSize = 14.sp
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        ColorPicker(
+            selectedColor = primaryColor,
+            onColorSelected = onPrimaryColorChange
+        )
+    }
+    
+    Spacer(modifier = Modifier.height(16.dp))
+    
+    // 副色选择器
+    Column {
+        Text(
+            text = "副色",
+            fontFamily = FontFamily.Monospace,
+            color = MaterialTheme.colorScheme.onSurface,
+            fontSize = 14.sp
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        ColorPicker(
+            selectedColor = secondaryColor,
+            onColorSelected = onSecondaryColorChange
+        )
+    }
+    
+    Spacer(modifier = Modifier.height(16.dp))
+    
+    // 圆角选择器
+    Column {
+        Text(
+            text = "圆角",
+            fontFamily = FontFamily.Monospace,
+            color = MaterialTheme.colorScheme.onSurface,
+            fontSize = 14.sp
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        BorderRadiusSelector(
+            selectedRadius = borderRadius,
+            onRadiusSelected = onBorderRadiusChange,
+            primaryColor = primaryColor
+        )
+    }
 }

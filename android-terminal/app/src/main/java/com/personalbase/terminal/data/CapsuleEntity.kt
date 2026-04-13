@@ -4,6 +4,16 @@ import androidx.room.Entity
 import androidx.room.PrimaryKey
 
 /**
+ * 同步状态枚举 - 跟踪胶囊的服务器同步状态
+ */
+enum class SyncStatus {
+    SYNCED,       // 成功上传
+    PENDING_SYNC, // 等待同步
+    SYNCING,      // 正在上传
+    FAILED        // 上传失败
+}
+
+/**
  * 胶囊实体类 - 表示一个独立的胶囊数据单元
  * 
  * 胶囊是系统中的核心数据单位，用于存储三种类型的内容：
@@ -27,6 +37,12 @@ data class CapsuleEntity(
     val timestamp: Long,
     // 状态：DRAFT-草稿 / PENDING-待回港 / ARCHIVED-已归档
     val status: String, // "DRAFT", "PENDING", "ARCHIVED"
+    // 同步状态：SYNCED-已同步 / PENDING_SYNC-等待同步 / SYNCING-同步中 / FAILED-同步失败
+    val syncStatus: SyncStatus = SyncStatus.PENDING_SYNC,
     // 最后输入提示，用于显示"刚刚保存为草稿"等提示信息
-    val lastInputHint: String? = null // For showing "刚刚保存为草稿" etc.
+    val lastInputHint: String? = null, // For showing "刚刚保存为草稿" etc.
+    // 收藏状态
+    val favorite: Boolean = false,
+    // 软删除时间戳 - null 表示未删除，非 null 表示已删除（值为删除时的时间戳）
+    val deletedAt: Long? = null
 )

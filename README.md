@@ -63,7 +63,7 @@ That means:
 - no cloud sync
 - no internet dependency
 - no public data flow
-- no “upload to somewhere else” by default
+- no "upload to somewhere else" by default
 
 Instead, the project focuses on:
 
@@ -76,7 +76,7 @@ Instead, the project focuses on:
 
 ## 🔄 Core Loop
 
-The central interaction of HomeDock is not just “upload” — it is:
+The central interaction of HomeDock is not just "upload" — it is:
 
 > **Return to Dock**
 
@@ -94,7 +94,7 @@ A typical flow looks like this:
 6. Watch the content arrive in your Web Base
 7. View, organize, archive, and revisit it on desktop
 
-This “return” loop is the heart of the project.
+This "return" loop is the heart of the project.
 
 ---
 
@@ -117,6 +117,7 @@ It is responsible for:
   - archive vault
   - todos
   - settings
+  - base map (visualization)
 
 ### 📱 Android Terminal
 
@@ -144,13 +145,18 @@ Supported capsule types:
 
 - 📡 Automatic local network discovery via mDNS / NSD
 - 📦 Offline-first local queue on Android
-- 🔄 One-tap “Return to Dock” synchronization
+- 🔄 One-tap "Return to Dock" synchronization
 - 🧱 Fragment Wall for browsing returned content
 - 🎧 Support for text / image / audio capsules
 - 🗂️ Archive Vault for browsing and managing stored items
 - 📝 Todos page
+- 🗺️ Base Map for visualizing capsule distribution
+- 🔔 Connection status indicator
 - ⚙️ Settings page
 - 🌙 Theme support (day / night / auto, depending on current implementation state)
+- 🤫 **Silent Mode** - A ultra-minimal dark mode that disables all animations and reduces visual noise. Perfect for deep focus or when you want an even calmer interface. Toggle via the top navigation bar.
+- 🗑️ Trash management for deleted items
+- 📋 Pending organization queue
 
 ### Experience goals
 
@@ -158,7 +164,7 @@ Supported capsule types:
 - no cloud dependency
 - local ownership of data
 - a calmer, more ritualized sync experience
-- dual-device interaction that feels like “bringing things home”
+- dual-device interaction that feels like "bringing things home"
 
 ---
 
@@ -168,12 +174,13 @@ Supported capsule types:
   <img src="./assets/home.png" width="45%" />
   <img src="./assets/echo.png" width="45%" />
   <img src="./assets/wall.png" width="45%" />
-  <img src="./assets/wall.png" width="45%" />
+  <img src="./assets/todo.png" width="45%" />
   <img src="./assets/archive.png" width="45%" />
   <img src="./assets/night.png" width="45%" />
-  <img src="./assets/phone-home.png" width="30%" />
-  <img src="./assets/phone-submit.png" width="30%" />
-  <img src="./assets/phone-capsule.png" width="30%" />
+  <img src="./assets/phone-home.png" width="20%" />
+  <img src="./assets/phone-submit.png" width="20%" />
+  <img src="./assets/phone-capsule.png" width="20%" />
+  <img src="./assets/phone-todo.png" width="20%" />
 </p>
 
 ---
@@ -186,22 +193,25 @@ For a more detailed technical route:
 
 ### Web stack
 
-- React
-- Vite
-- Node.js
-- Express
+- React 19 + Vite 8
+- Node.js + Express 5
 - SQLite
-- Tailwind CSS
-- Framer Motion
+- Tailwind CSS 4 + Framer Motion 12
+- ECharts 5 + echarts-for-react
+- React Router 7
+- Axios, Multer, Bonjour-service, dayjs, Lucide icons
 
 ### Android stack
 
-- Kotlin
-- Jetpack Compose
+- Kotlin + Jetpack Compose
 - Material 3
-- Room
-- Retrofit
+- Room (local database)
+- Retrofit + OkHttp (networking)
+- CameraX (camera capture)
+- Coil (image loading)
 - NSD / mDNS discovery
+- Accompanist (permissions)
+- Min SDK 26 / Target SDK 34 / JVM 17
 
 ### Network / sync
 
@@ -217,14 +227,61 @@ For a more detailed technical route:
 .
 ├── web-base/
 │   ├── server/
+│   │   ├── db.ts          # SQLite connection & queries
+│   │   ├── events.ts     # SSE event handling
+│   │   ├── index.ts      # Express app entry
+│   │   ├── nsd.ts        # Bonjour/mDNS broadcast
+│   │   └── routes.ts     # API routes
 │   ├── src/
-│   └── package.json
+│   │   ├── components/    # 20+ React components
+│   │   │   ├── charts/   # ECharts wrappers
+│   │   │   ├── context/  # React context providers
+│   │   │   └── hooks/    # Custom hooks (useSSE, useToast, useConnectionStatus)
+│   │   ├── pages/        # 6 pages: Archive, Echo, Home, Settings, Todos, Wall
+│   │   └── ...
+│   ├── package.json
+│   └── vite.config.ts
 ├── android-terminal/
-│   ├── app/
-│   └── build.gradle
-├── README.md
-└── README.zh-CN.md
+│   ├── app/src/main/java/com/personalbase/terminal/
+│   │   ├── data/         # Room: Database, DAOs, Entities, Repository
+│   │   ├── nsd/          # NsdHelper for mDNS discovery
+│   │   ├── ui/
+│   │   │   ├── screens/  # 8 Compose screens
+│   │   │   └── Theme.kt
+│   │   └── ...
+│   └── build.gradle.kts
+├── assets/
+│   ├── TECHNICAL_ROUTE.md
+│   └── screenshots/
+└── README.md
 ```
+
+---
+
+## 🔧 Prerequisites
+
+Before you start, make sure you have the following installed:
+
+### For Web Base
+
+| Requirement | Version | Notes |
+|-------------|---------|-------|
+| **Node.js** | ≥ 18 recommended | [Download](https://nodejs.org/) |
+| **npm** | Comes with Node.js | Or use `pnpm` / `yarn` |
+
+### For Android Terminal
+
+| Requirement | Version | Notes |
+|-------------|---------|-------|
+| **Android Studio** | Latest stable | [Download](https://developer.android.com/studio) |
+| **JDK** | 17 | Bundled with Android Studio |
+| **Android device** | SDK 26+ (Android 8.0) | Real device recommended for full NSD testing |
+| **Gradle** | Bundled | Auto-installed by Android Studio |
+
+### For the full loop
+
+- A computer and Android phone on the **same LAN / Wi-Fi**
+- (Optional for NSD) A non-emulator Android device — emulators cannot receive mDNS broadcasts from the host machine
 
 ---
 
@@ -238,21 +295,24 @@ npm install
 npm run dev
 ```
 
-This should start the local web base, including frontend and backend development services.
+This starts:
+- **Frontend**: Vite dev server at `http://localhost:5173`
+- **Backend**: Express API at `http://localhost:3000`
 
 ### 2. Run the Android Terminal
 
-1. Open `android-terminal` in Android Studio
-2. Connect a real Android device
-3. Make sure the phone and computer are on the same Wi-Fi / LAN
+1. Open `android-terminal/` in Android Studio
+2. Sync Gradle
+3. Connect a real Android device (on same Wi-Fi as your computer)
 4. Run the app
 
 ### 3. Try the full loop
 
-- Create a capsule on Android
-- Wait for the base to be discovered
-- Trigger **Return to Dock**
-- Check the Web Base for new content
+- Create a capsule on Android (text / image / audio)
+- Wait for the base to be discovered via mDNS
+- Tap **Return to Dock**
+- Watch the content arrive in your Web Base
+- Browse, organize, or archive it on desktop
 
 ---
 
@@ -287,7 +347,7 @@ Create locally first. Decide later when to sync back.
 
 ### 3. Ritual over generic sync
 
-“Return to Dock” should feel more intentional than a normal upload button.
+"Return to Dock" should feel more intentional than a normal upload button.
 
 ### 4. Private by default
 
@@ -318,7 +378,7 @@ Planned or possible next steps:
 
 - improve real-time Web update after Android return
 - richer archive and fragment organization
-- better “echo” mechanics
+- better "echo" mechanics
 - stronger visual system on desktop
 - optional visualization layer
 - more robust sync history / status feedback
@@ -362,6 +422,6 @@ while respecting the Apache-2.0 terms.
 
 HomeDock is not something you *need*.
 
-It is something you build so that,even when the internet is gone,
+It is something you build so that, even when the internet is gone,
 
 > you still have a system that belongs only to you.

@@ -82,6 +82,11 @@ const TopNav: React.FC<TopNavProps> = ({
 
   const currentPage = getPageName(location.pathname);
 
+  // Only show TopNav on Home page, hide on all other pages
+  if (location.pathname !== '/') {
+    return null;
+  }
+
   return (
     <header className="h-10 bg-[var(--color-base-panel)]/95 backdrop-blur-sm border-b border-[var(--color-base-border)] z-50 px-4 flex items-center justify-between">
       {/* Left: Project name / current space */}
@@ -148,13 +153,20 @@ const TopNav: React.FC<TopNavProps> = ({
         <div className="w-px h-4 bg-[var(--color-base-border)] mx-1" />
 
         {/* LAN Status */}
-        <div className="flex items-center gap-1.5 px-2 py-1">
+        <div 
+          className="flex items-center gap-1.5 px-2 py-1"
+          title={isLANConnected ? '已连接到基地服务' : '无法连接到基地服务'}
+        >
           {isLANConnected ? (
             <Wifi size={11} className="text-[var(--color-base-success)]" />
           ) : (
-            <WifiOff size={11} className="text-[var(--color-base-text)]/40" />
+            <WifiOff size={11} className="text-red-500/70" />
           )}
-          <span className="text-[9px] font-mono text-[var(--color-base-text)]/50 tracking-widest">LAN</span>
+          <span className={`text-[9px] font-mono tracking-widest ${
+            isLANConnected ? 'text-[var(--color-base-text)]/50' : 'text-red-500/70'
+          }`}>
+            LAN
+          </span>
         </div>
 
         {/* Separator */}

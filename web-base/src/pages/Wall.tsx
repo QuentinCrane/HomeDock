@@ -20,16 +20,16 @@
  *   - 筛选：前端过滤（type + status + searchQuery）
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { Capsule, CapsuleStatus } from '../api';
-import { fetchCapsules } from '../api';
+import { fetchCapsules, deleteCapsule, organizeCapsule } from '../api';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, Search, Grid, List, Trash2, AlertCircle, RefreshCw, FileText, Image, Mic, Layers, Plus, Home, Radio } from 'lucide-react';
+import { ArrowLeft, Search, Grid, List, Trash2, AlertCircle, RefreshCw, FileText, Image, Mic, Layers, Plus, Home, Radio, Archive, Inbox, Repeat } from 'lucide-react';
 import dayjs from 'dayjs';
 import CapsuleDrawer from '../components/CapsuleDrawer';
 import { useCapsuleSync } from '../hooks/useSSE';
-import { useSyncToast } from '../hooks/useToast';
+import { useSyncToast, useToast } from '../hooks/useToast';
 
 /// 筛选类型
 type FilterType = 'all' | 'text' | 'image' | 'audio';
@@ -56,6 +56,13 @@ const typeColors = {
   text: { bg: 'rgba(96, 165, 250, 0.15)', text: '#60a5fa', icon: FileText },
   image: { bg: 'rgba(251, 191, 36, 0.15)', text: '#fbbf24', icon: Image },
   audio: { bg: 'rgba(52, 211, 153, 0.15)', text: '#34d399', icon: Mic },
+};
+
+// Deterministic pseudo-random based on capsule ID (no Math.random)
+const getAudioBarHeight = (index: number, id: number): number => {
+  const seed = id * 1000 + index;
+  const noise = Math.sin(seed * 0.1) * 0.5 + 0.5;
+  return 20 + noise * 40;
 };
 
 const WallPage: React.FC = () => {
@@ -88,17 +95,20 @@ const WallPage: React.FC = () => {
   }, []);
 
   const { showSyncToast } = useSyncToast();
+  const { addToast } = useToast();
   const { isSSEConnected } = useCapsuleSync(
     () => { loadCapsules(); },
     { onSyncToast: showSyncToast }
   );
 
-  const filtered = capsules.filter(c => {
-    if (filterStatus !== 'all' && c.status !== filterStatus) return false;
-    if (filterType !== 'all' && c.type !== filterType) return false;
-    if (searchQuery && !c.content?.toLowerCase().includes(searchQuery.toLowerCase()) && !c.id.toString().includes(searchQuery)) return false;
-    return true;
-  }).sort((a, b) => b.timestamp - a.timestamp);
+  const filtered = useMemo(() => 
+    capsules.filter(c => {
+      if (filterStatus !== 'all' && c.status !== filterStatus) return false;
+      if (filterType !== 'all' && c.type !== filterType) return false;
+      if (searchQuery && !c.content?.toLowerCase().includes(searchQuery.toLowerCase()) && !c.id.toString().includes(searchQuery)) return false;
+      return true;
+    }).sort((a, b) => b.timestamp - a.timestamp),
+  [capsules, filterStatus, filterType, searchQuery]);
 
   const isRecent = (ts: number) => dayjs().diff(dayjs(ts), 'minute') < 10;
 
@@ -111,10 +121,32 @@ const WallPage: React.FC = () => {
     e.stopPropagation();
     if (confirm('确定要删除这个碎片吗？')) {
       try {
-        await fetch(`/api/capsules/${capsule.id}`, { method: 'DELETE' });
+        await deleteCapsule(capsule.id);
         loadCapsules();
       } catch (err) {
         console.error(err);
+      }
+    }
+  };
+
+  const handleOrganize = async (e: React.MouseEvent, capsule: Capsule, action: 'archive' | 'wall' | 'echo' | 'delete') => {
+    e.stopPropagation();
+    const actionLabels = { archive: '归档', wall: 'Wall', echo: '回响', delete: '删除' };
+    const confirmMessages = {
+      archive: `确定要归档这个碎片吗？`,
+      wall: `确定要将这个碎片标记为 Wall 吗？`,
+      echo: `确定要将这个碎片发送到回响池吗？`,
+      delete: `确定要删除这个碎片吗？`
+    };
+    
+    if (confirm(confirmMessages[action])) {
+      try {
+        await organizeCapsule(capsule.id, action);
+        addToast(`${actionLabels[action]}成功`, 'success');
+        loadCapsules();
+      } catch (err) {
+        console.error(err);
+        addToast(`${actionLabels[action]}失败`, 'error');
       }
     }
   };
@@ -412,17 +444,22 @@ const WallPage: React.FC = () => {
               return (
                 <motion.div
                   key={cap.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: Math.min(idx * 0.02, 0.3), duration: 0.3 }}
-                  className="break-inside-avoid relative"
+                  initial={{ opacity: 0, y: 30, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  transition={{ 
+                    delay: Math.min(idx * 0.03, 0.4),
+                    type: 'spring',
+                    stiffness: 260,
+                    damping: 25
+                  }}
+                  whileHover={{ y: -4, boxShadow: '0 12px 40px rgba(0,0,0,0.4)' }}
+                  whileTap={{ scale: 0.98 }}
+                  className="break-inside-avoid relative cursor-pointer"
                   layout
                 >
                   <div
                     onClick={() => handleCapsuleClick(cap)}
-                    className={`rounded-xl overflow-hidden cursor-pointer transition-all group ${
-                      isDeleted ? 'opacity-60' : 'hover:shadow-lg hover:-translate-y-0.5'
-                    }`}
+                    className="rounded-xl overflow-hidden group"
                     style={{ 
                       backgroundColor: 'var(--color-base-panel)',
                       border: '1px solid var(--color-base-border)'
@@ -501,7 +538,7 @@ const WallPage: React.FC = () => {
                                 key={i}
                                 className="flex-1 rounded-full"
                                 style={{
-                                  height: `${20 + Math.sin(i * 0.6 + (cap.id || 0) * 0.1) * 30 + Math.random() * 20}%`,
+                                  height: `${getAudioBarHeight(i, cap.id || 0)}%`,
                                   minHeight: '4px',
                                   backgroundColor: 'var(--color-base-accent)',
                                   opacity: 0.3 + (i % 4) * 0.1
@@ -535,20 +572,85 @@ const WallPage: React.FC = () => {
                       className="absolute inset-0 rounded-xl border-2 border-transparent group-hover:border-[var(--color-base-accent)]/20 transition-all pointer-events-none"
                     />
 
-                    {/* Delete button */}
+                    {/* Action buttons - shown for pending capsules or on hover */}
                     {!isDeleted && (
-                      <motion.button
-                        initial={{ opacity: 0 }}
-                        whileHover={{ scale: 1.05 }}
-                        onClick={(e) => handleQuickDelete(e, cap)}
-                        className="absolute top-3 right-3 p-1.5 rounded-lg text-[var(--color-base-text)] hover:text-red-400 transition-all opacity-0 group-hover:opacity-100"
-                        style={{ 
-                          backgroundColor: 'var(--color-base-bg)',
-                          border: '1px solid var(--color-base-border)'
-                        }}
-                      >
-                        <Trash2 size={10} />
-                      </motion.button>
+                      <div className="absolute top-3 right-3 flex gap-1">
+                        {filterStatus === 'pending' ? (
+                          /* Pending capsule action buttons */
+                          <>
+                            <motion.button
+                              initial={{ opacity: 0, scale: 0.8 }}
+                              whileHover={{ scale: 1.1 }}
+                              onClick={(e) => handleOrganize(e, cap, 'archive')}
+                              className="p-1.5 rounded-lg transition-all"
+                              style={{ 
+                                backgroundColor: 'var(--color-base-panel)',
+                                border: '1px solid var(--color-base-border)',
+                                color: 'var(--color-base-text)'
+                              }}
+                              title="归档"
+                            >
+                              <Archive size={10} />
+                            </motion.button>
+                            <motion.button
+                              initial={{ opacity: 0, scale: 0.8 }}
+                              whileHover={{ scale: 1.1 }}
+                              onClick={(e) => handleOrganize(e, cap, 'wall')}
+                              className="p-1.5 rounded-lg transition-all"
+                              style={{ 
+                                backgroundColor: 'var(--color-base-panel)',
+                                border: '1px solid var(--color-base-border)',
+                                color: 'var(--color-base-accent)'
+                              }}
+                              title="Wall"
+                            >
+                              <Inbox size={10} />
+                            </motion.button>
+                            <motion.button
+                              initial={{ opacity: 0, scale: 0.8 }}
+                              whileHover={{ scale: 1.1 }}
+                              onClick={(e) => handleOrganize(e, cap, 'echo')}
+                              className="p-1.5 rounded-lg transition-all"
+                              style={{ 
+                                backgroundColor: 'var(--color-base-panel)',
+                                border: '1px solid var(--color-base-border)',
+                                color: '#a78bfa'
+                              }}
+                              title="回响"
+                            >
+                              <Repeat size={10} />
+                            </motion.button>
+                            <motion.button
+                              initial={{ opacity: 0, scale: 0.8 }}
+                              whileHover={{ scale: 1.1, color: '#ef4444' }}
+                              onClick={(e) => handleOrganize(e, cap, 'delete')}
+                              className="p-1.5 rounded-lg transition-all"
+                              style={{ 
+                                backgroundColor: 'var(--color-base-panel)',
+                                border: '1px solid var(--color-base-border)',
+                                color: 'var(--color-base-text)'
+                              }}
+                              title="删除"
+                            >
+                              <Trash2 size={10} />
+                            </motion.button>
+                          </>
+                        ) : (
+                          /* Default delete button for non-pending capsules */
+                          <motion.button
+                            initial={{ opacity: 0 }}
+                            whileHover={{ scale: 1.05 }}
+                            onClick={(e) => handleQuickDelete(e, cap)}
+                            className="p-1.5 rounded-lg text-[var(--color-base-text)] hover:text-red-400 transition-all opacity-0 group-hover:opacity-100"
+                            style={{ 
+                              backgroundColor: 'var(--color-base-bg)',
+                              border: '1px solid var(--color-base-border)'
+                            }}
+                          >
+                            <Trash2 size={10} />
+                          </motion.button>
+                        )}
+                      </div>
                     )}
                   </div>
                 </motion.div>
@@ -596,14 +698,53 @@ const WallPage: React.FC = () => {
                       {statusStyle.label}
                     </span>
 
-                    {/* Delete */}
+                    {/* Actions */}
                     {!cap.deletedAt && (
-                      <button
-                        onClick={(e) => handleQuickDelete(e, cap)}
-                        className="p-1.5 text-[var(--color-base-text)] hover:text-red-400 transition-colors"
-                      >
-                        <Trash2 size={12} />
-                      </button>
+                      <div className="flex items-center gap-1">
+                        {filterStatus === 'pending' ? (
+                          <>
+                            <button
+                              onClick={(e) => handleOrganize(e, cap, 'archive')}
+                              className="p-1.5 rounded transition-colors hover:bg-[var(--color-base-border)]"
+                              style={{ color: 'var(--color-base-text)' }}
+                              title="归档"
+                            >
+                              <Archive size={12} />
+                            </button>
+                            <button
+                              onClick={(e) => handleOrganize(e, cap, 'wall')}
+                              className="p-1.5 rounded transition-colors hover:bg-[var(--color-base-border)]"
+                              style={{ color: 'var(--color-base-accent)' }}
+                              title="Wall"
+                            >
+                              <Inbox size={12} />
+                            </button>
+                            <button
+                              onClick={(e) => handleOrganize(e, cap, 'echo')}
+                              className="p-1.5 rounded transition-colors hover:bg-[var(--color-base-border)]"
+                              style={{ color: '#a78bfa' }}
+                              title="回响"
+                            >
+                              <Repeat size={12} />
+                            </button>
+                            <button
+                              onClick={(e) => handleOrganize(e, cap, 'delete')}
+                              className="p-1.5 rounded transition-colors hover:text-red-400 hover:bg-[var(--color-base-border)]"
+                              style={{ color: 'var(--color-base-text)' }}
+                              title="删除"
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            onClick={(e) => handleQuickDelete(e, cap)}
+                            className="p-1.5 text-[var(--color-base-text)] hover:text-red-400 transition-colors"
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        )}
+                      </div>
                     )}
                   </div>
                 </motion.div>

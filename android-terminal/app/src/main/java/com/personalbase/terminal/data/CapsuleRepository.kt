@@ -26,6 +26,10 @@ class CapsuleRepository(private val dao: CapsuleDao) {
     val pendingCount: Flow<Int> = dao.getPendingCount()
     // 已归档数量计数
     val archivedCount: Flow<Int> = dao.getArchivedCount()
+    // 同步失败数量计数
+    val failedCount: Flow<Int> = dao.getFailedCount()
+    // 已删除胶囊列表（回收站）
+    val deletedCapsules: Flow<List<CapsuleEntity>> = dao.getDeletedCapsules()
 
     /**
      * 添加新胶囊
@@ -69,4 +73,57 @@ class CapsuleRepository(private val dao: CapsuleDao) {
     
     // 获取待回港胶囊列表（用于批量回港操作）
     suspend fun getPendingList() = dao.getPendingCapsulesList()
+
+    // 更新胶囊同步状态
+    suspend fun updateSyncStatus(capsuleId: Int, status: SyncStatus) {
+        dao.updateSyncStatus(capsuleId, status.name)
+    }
+
+    // 获取同步失败的胶囊列表
+    suspend fun getFailedCapsules() = dao.getFailedCapsules()
+
+    // 重置胶囊同步状态为 PENDING_SYNC（用于重试）
+    suspend fun resetSyncStatus(capsuleId: Int) {
+        dao.resetSyncStatus(capsuleId)
+    }
+
+    // 删除胶囊（软删除 - 设置 deletedAt 时间戳）
+    suspend fun deleteCapsule(capsule: CapsuleEntity) {
+        dao.softDelete(capsule.id, System.currentTimeMillis())
+    }
+
+    // 永久删除胶囊（用于清空回收站中的单个胶囊）
+    suspend fun permanentDeleteCapsule(id: Int) {
+        dao.permanentDelete(id)
+    }
+
+    // 清空回收站（删除所有已软删除的胶囊）
+    suspend fun emptyTrash() {
+        dao.emptyTrash()
+    }
+
+    // 恢复胶囊（清除 deletedAt）
+    suspend fun restoreCapsule(id: Int) {
+        dao.restore(id)
+    }
+
+    // 通过ID获取胶囊
+    suspend fun getCapsuleById(id: Int): CapsuleEntity? {
+        return dao.getCapsuleById(id)
+    }
+
+    // 更新胶囊内容
+    suspend fun updateCapsule(capsule: CapsuleEntity) {
+        dao.update(capsule)
+    }
+
+    // 切换收藏状态
+    suspend fun toggleFavorite(capsule: CapsuleEntity) {
+        dao.update(capsule.copy(favorite = !capsule.favorite))
+    }
+
+    // 获取收藏胶囊列表
+    fun getFavoriteCapsules(): Flow<List<CapsuleEntity>> {
+        return dao.getFavoriteCapsules()
+    }
 }

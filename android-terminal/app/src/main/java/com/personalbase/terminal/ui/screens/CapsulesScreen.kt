@@ -5,7 +5,6 @@ import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -25,7 +24,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.scale
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
@@ -38,8 +36,6 @@ import com.personalbase.terminal.data.CapsuleEntity
 import com.personalbase.terminal.CapsuleDetailChip
 import com.personalbase.terminal.ui.MainViewModel
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
-import kotlin.math.abs
 
 // ============================================================================
 // CAPSULES SCREEN - 胶囊库屏幕
@@ -49,7 +45,6 @@ import kotlin.math.abs
 // - 支持按类型筛选（文字、图片、音频）
 // - 支持按状态筛选（草稿、待回港、已归档、收藏）
 // - 支持关键词搜索
-// - 左滑删除/归档，右滑收藏/重新提交
 // - 长按弹出快捷操作菜单
 // - 点击查看胶囊详情（底部弹窗）
 // 
@@ -64,13 +59,13 @@ import kotlin.math.abs
 // - 筛选图标：切换筛选面板
 // - 胶囊项点击：展开详情底部弹窗
 // - 胶囊项长按：显示快捷操作菜单
-// - 左右滑动：触发对应操作
 // ============================================================================
 
 @Composable
 fun CapsulesScreen(
     viewModel: MainViewModel,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onNavigateToTrash: () -> Unit = {}
 ) {
     val drafts by viewModel.draftCapsules.collectAsState(initial = emptyList())
     val pending by viewModel.pendingCapsules.collectAsState(initial = emptyList())
@@ -95,6 +90,11 @@ fun CapsulesScreen(
     var quickActionMenuVisible by remember { mutableStateOf(false) }
     var quickActionCapsule by remember { mutableStateOf<CapsuleEntity?>(null) }
     var quickActionPosition by remember { mutableStateOf(Offset(0f, 0f)) }
+
+    // Edit dialog state
+    var showEditDialog by remember { mutableStateOf(false) }
+    var editingCapsule by remember { mutableStateOf<CapsuleEntity?>(null) }
+    var editContent by remember { mutableStateOf("") }
 
     // Screen launch animation
     var screenVisible by remember { mutableStateOf(false) }
@@ -163,6 +163,14 @@ fun CapsulesScreen(
                                 imageVector = Icons.Default.FilterList,
                                 contentDescription = "筛选",
                                 tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
+                            )
+                        }
+                        // Trash icon - navigate to TrashScreen
+                        IconButton(onClick = onNavigateToTrash) {
+                            Icon(
+                                imageVector = Icons.Default.Delete,
+                                contentDescription = "回收站",
+                                tint = MaterialTheme.colorScheme.error.copy(alpha = 0.6f)
                             )
                         }
                     }
@@ -274,7 +282,7 @@ fun CapsulesScreen(
                             items = filteredCapsules,
                             key = { _, capsule -> capsule.id }
                         ) { index, capsule ->
-                            SwipeableCapsuleItem(
+                            CapsuleItemWithInteraction(
                                 capsule = capsule,
                                 index = index,
                                 onShowDetails = {
@@ -285,9 +293,7 @@ fun CapsulesScreen(
                                     quickActionCapsule = capsule
                                     quickActionPosition = offset
                                     quickActionMenuVisible = true
-                                },
-                                onSwipeLeft = { /* Delete or Archive */ },
-                                onSwipeRight = { /* Favorite or Resubmit */ }
+                                }
                             )
                         }
                     }
@@ -303,9 +309,17 @@ fun CapsulesScreen(
                     isBottomSheetVisible = false
                     selectedCapsule = null
                 },
-                onDelete = { /* Handle delete */ },
-                onFavorite = { /* Handle favorite */ },
-                onChangeStatus = { /* Handle status change */ }
+                onDelete = {
+                    viewModel.deleteCapsule(selectedCapsule!!.id)
+                    isBottomSheetVisible = false
+                    selectedCapsule = null
+                },
+                onFavorite = {
+                    viewModel.toggleFavorite(selectedCapsule!!)
+                },
+                onChangeStatus = { newStatus ->
+                    viewModel.organizeCapsule(selectedCapsule!!.id, newStatus)
+                }
             )
         }
 
@@ -318,10 +332,39 @@ fun CapsulesScreen(
                     quickActionMenuVisible = false
                     quickActionCapsule = null
                 },
-                onEdit = { /* Handle edit */ },
-                onFavorite = { /* Handle favorite */ },
-                onDelete = { /* Handle delete */ },
-                onChangeStatus = { /* Handle status change */ }
+                onEdit = {
+                    editingCapsule = quickActionCapsule
+                    editContent = quickActionCapsule!!.content ?: ""
+                    showEditDialog = true
+                },
+                onFavorite = {
+                    viewModel.toggleFavorite(quickActionCapsule!!)
+                },
+                onDelete = {
+                    viewModel.deleteCapsule(quickActionCapsule!!.id)
+                },
+                onChangeStatus = { newStatus ->
+                    viewModel.organizeCapsule(quickActionCapsule!!.id, newStatus)
+                }
+            )
+        }
+
+        // Edit Dialog
+        if (showEditDialog && editingCapsule != null) {
+            EditCapsuleDialog(
+                content = editContent,
+                onContentChange = { editContent = it },
+                onDismiss = {
+                    showEditDialog = false
+                    editingCapsule = null
+                    editContent = ""
+                },
+                onConfirm = {
+                    viewModel.updateCapsuleContent(editingCapsule!!.id, editContent)
+                    showEditDialog = false
+                    editingCapsule = null
+                    editContent = ""
+                }
             )
         }
     }
@@ -493,161 +536,6 @@ private fun CapsulesEmptyState(
 }
 
 // ============================================================================
-// SWIPEABLE CAPSULE ITEM - 可滑动的胶囊项
-// 
-// 功能说明：
-// - 封装胶囊项，提供左右滑动操作
-// - 支持长按和单击两种交互
-// 
-// 滑动操作：
-// - 左滑（阈值 150dp）：删除或归档（取决于胶囊当前状态）
-// - 右滑（阈值 150dp）：收藏或重新提交（取决于胶囊当前状态）
-// - 最大滑动：225dp（1.5 倍阈值）
-// 
-// 滑动背景视觉：
-// - 左滑背景：红色渐变（透明到 30% 红色），左侧显示删除/归档图标
-// - 右滑背景：橙色渐变（透明到 30% 橙色），右侧显示收藏/提交图标
-// - 图标和背景透明度随滑动进度渐变
-// 
-// 动画参数：
-// - 回弹动画：弹簧阻尼 0.6，刚度 400
-// - 滑动进度：offsetX / swipeThreshold，范围 -1 ~ 1
-// 
-// 手势冲突处理：
-// - 水平拖拽和点击共存
-// - 长按优先于单击
-// 
-// 用户交互：
-// - 左滑：触发 onSwipeLeft
-// - 右滑：触发 onSwipeRight
-// - 长按：触发 onLongPress，传递按压坐标
-// - 单击：触发 onShowDetails
-// ============================================================================
-
-@Composable
-private fun SwipeableCapsuleItem(
-    capsule: CapsuleEntity,
-    index: Int,
-    onShowDetails: () -> Unit,
-    onLongPress: (Offset) -> Unit,
-    onSwipeLeft: () -> Unit,
-    onSwipeRight: () -> Unit
-) {
-    var offsetX by remember { mutableStateOf(0f) }
-    val swipeThreshold = 150f
-
-    val animatedOffset by animateFloatAsState(
-        targetValue = offsetX,
-        animationSpec = spring(dampingRatio = 0.6f, stiffness = 400f),
-        label = "swipe_offset"
-    )
-
-    val swipeProgress by remember {
-        derivedStateOf { (offsetX / swipeThreshold).coerceIn(-1f, 1f) }
-    }
-
-    val scope = rememberCoroutineScope()
-
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .offset(x = animatedOffset.dp)
-            .pointerInput(Unit) {
-                detectHorizontalDragGestures(
-                    onDragEnd = {
-                        when {
-                            offsetX < -swipeThreshold -> {
-                                // Swipe left - Delete or Archive
-                                scope.launch {
-                                    offsetX = -300f
-                                    onSwipeLeft()
-                                    offsetX = 0f
-                                }
-                            }
-                            offsetX > swipeThreshold -> {
-                                // Swipe right - Favorite or Resubmit
-                                scope.launch {
-                                    offsetX = 300f
-                                    onSwipeRight()
-                                    offsetX = 0f
-                                }
-                            }
-                            else -> offsetX = 0f
-                        }
-                    },
-                    onDragCancel = { offsetX = 0f },
-                    onHorizontalDrag = { _, dragAmount ->
-                        offsetX = (offsetX + dragAmount).coerceIn(-swipeThreshold * 1.5f, swipeThreshold * 1.5f)
-                    }
-                )
-            }
-                .pointerInput(Unit) {
-                detectTapGestures(
-                    onLongPress = { offset ->
-                        onLongPress(offset)
-                    },
-                    onTap = { onShowDetails() }
-                )
-            }
-    ) {
-        // Left swipe background (Delete/Archive)
-        Box(
-            modifier = Modifier
-                .matchParentSize()
-                .background(
-                    brush = Brush.horizontalGradient(
-                        colors = listOf(
-                            Color(0xFFEF4444).copy(alpha = swipeProgress.coerceIn(0f, 1f) * 0.3f),
-                            Color.Transparent
-                        )
-                    )
-                )
-                .padding(start = 16.dp),
-            contentAlignment = Alignment.CenterStart
-        ) {
-            if (offsetX < 0) {
-                Icon(
-                    imageVector = if (capsule.status == "ARCHIVED") Icons.Default.Delete else Icons.Default.Archive,
-                    contentDescription = if (capsule.status == "ARCHIVED") "删除" else "归档",
-                    tint = Color(0xFFEF4444).copy(alpha = swipeProgress.coerceIn(0f, 1f)),
-                    modifier = Modifier.size(24.dp)
-                )
-            }
-        }
-
-        // Right swipe background (Favorite/Resubmit)
-        Box(
-            modifier = Modifier
-                .matchParentSize()
-                .background(
-                    brush = Brush.horizontalGradient(
-                        colors = listOf(
-                            Color.Transparent,
-                            Color(0xFFD97706).copy(alpha = swipeProgress.coerceIn(0f, 1f) * 0.3f)
-                        )
-                    )
-                )
-                .padding(end = 16.dp),
-            contentAlignment = Alignment.CenterEnd
-        ) {
-            if (offsetX > 0) {
-                Icon(
-                    imageVector = if (capsule.status == "PENDING") Icons.Default.Favorite else Icons.Default.Send,
-                    contentDescription = if (capsule.status == "PENDING") "收藏" else "重新提交",
-                    tint = Color(0xFFD97706).copy(alpha = swipeProgress.coerceIn(0f, 1f)),
-                    modifier = Modifier.size(24.dp)
-                )
-            }
-        }
-
-        AnimatedCapsuleItem(
-            capsule = capsule,
-            index = index
-        )
-    }
-}
-
-// ============================================================================
 // ANIMATED CAPSULE ITEM - 动画胶囊项
 // 
 // 功能说明：
@@ -689,6 +577,44 @@ private fun AnimatedCapsuleItem(
         exit = fadeOut(tween(200))
     ) {
         CapsuleCard(capsule = capsule)
+    }
+}
+
+// ============================================================================
+// CAPSULE ITEM WITH INTERACTION - 带交互的胶囊项（无滑动）
+// 
+// 功能说明：
+// - 封装胶囊项，提供点击和长按交互
+// - 移除了滑动功能，简化交互
+// 
+// 用户交互：
+// - 长按：触发 onLongPress，传递按压坐标
+// - 单击：触发 onShowDetails
+// ============================================================================
+
+@Composable
+private fun CapsuleItemWithInteraction(
+    capsule: CapsuleEntity,
+    index: Int,
+    onShowDetails: () -> Unit,
+    onLongPress: (Offset) -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .pointerInput(Unit) {
+                detectTapGestures(
+                    onLongPress = { offset ->
+                        onLongPress(offset)
+                    },
+                    onTap = { onShowDetails() }
+                )
+            }
+    ) {
+        AnimatedCapsuleItem(
+            capsule = capsule,
+            index = index
+        )
     }
 }
 
@@ -1351,6 +1277,63 @@ private fun QuickActionMenuItem(
 private fun formatTimestamp(timestamp: Long): String {
     val sdf = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.getDefault())
     return sdf.format(java.util.Date(timestamp))
+}
+
+// ============================================================================
+// EDIT CAPSULE DIALOG - 编辑胶囊内容对话框
+// 
+// 功能说明：
+// - 用于编辑胶囊的文字内容
+// - 显示输入框，预填当前内容
+// 
+// 视觉布局：
+// - 标题：编辑胶囊
+// - 输入框：OutlinedTextField，可多行
+// - 按钮：取消/确认
+// 
+// 用户交互：
+// - 取消：关闭对话框
+// - 确认：调用 onConfirm 回调，传递新内容
+// ============================================================================
+
+@Composable
+private fun EditCapsuleDialog(
+    content: String,
+    onContentChange: (String) -> Unit,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = "编辑胶囊",
+                fontFamily = FontFamily.Monospace,
+                color = MaterialTheme.colorScheme.primary
+            )
+        },
+        text = {
+            OutlinedTextField(
+                value = content,
+                onValueChange = onContentChange,
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("内容", fontFamily = FontFamily.Monospace) },
+                minLines = 3,
+                maxLines = 6,
+                textStyle = LocalTextStyle.current.copy(fontFamily = FontFamily.Monospace)
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = onConfirm) {
+                Text("确认", fontFamily = FontFamily.Monospace)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("取消", fontFamily = FontFamily.Monospace)
+            }
+        }
+    )
 }
 
 // Offset class for long press position

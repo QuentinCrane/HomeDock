@@ -178,8 +178,8 @@ export const CaptureDock: React.FC<CaptureDockProps> = ({
                   <Image size={22} />
                 </motion.div>
                 <div className="text-center">
-                  <p className="text-xs font-mono mb-1">点击上传</p>
-                  <p className="text-[9px] opacity-50">JPG, PNG, GIF</p>
+                  <p className="text-xs font-mono mb-1">点击上传图片</p>
+                  <p className="text-[9px] opacity-50">JPG, PNG, GIF 支持</p>
                 </div>
               </motion.button>
             )}
@@ -201,26 +201,28 @@ export const CaptureDock: React.FC<CaptureDockProps> = ({
                 </motion.button>
               </div>
             ) : (
-              <motion.button
-                onClick={isRecording ? stopRecording : startRecording}
-                className={`w-20 h-20 rounded-full flex items-center justify-center border-2 transition-all duration-300 ${
-                  isRecording
-                    ? 'border-red-500/60 bg-red-500/10 text-red-500'
-                    : 'border-[var(--color-base-accent)]/50 bg-[var(--color-base-accent)]/5 text-[var(--color-base-accent)]'
-                }`}
-                animate={isRecording ? { scale: [1, 1.05, 1] } : {}}
-                transition={isRecording ? { duration: 1, repeat: Infinity } : {}}
-                whileHover={!isRecording ? { y: -2, boxShadow: '0 0 20px rgba(74, 122, 155, 0.3)' } : {}}
-                whileTap={{ scale: 0.98 }}
-              >
-                <Mic size={28} />
-              </motion.button>
+              <div className="flex flex-col items-center gap-4">
+                <motion.button
+                  onClick={isRecording ? stopRecording : startRecording}
+                  className={`w-20 h-20 rounded-full flex items-center justify-center border-2 transition-all duration-300 ${
+                    isRecording
+                      ? 'border-red-500/60 bg-red-500/10 text-red-500'
+                      : 'border-[var(--color-base-accent)]/50 bg-[var(--color-base-accent)]/5 text-[var(--color-base-accent)]'
+                  }`}
+                  animate={isRecording ? { scale: [1, 1.05, 1] } : {}}
+                  transition={isRecording ? { duration: 1, repeat: Infinity } : {}}
+                  whileHover={isRecording ? {} : { y: -2, boxShadow: '0 0 20px rgba(74, 122, 155, 0.3)' }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  <Mic size={28} />
+                </motion.button>
+                <div className="text-center">
+                  <p className="text-xs font-mono text-[var(--color-base-text)]">
+                    {isRecording ? '● 录音中 - 点击停止' : '点击开始录音'}
+                  </p>
+                </div>
+              </div>
             )}
-            <div className="text-center">
-              <p className="text-xs font-mono text-[var(--color-base-text)]">
-                {isRecording ? '● 录音中' : audioBlob ? '已保存' : '点击开始'}
-              </p>
-            </div>
           </div>
         )}
       </div>

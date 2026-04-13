@@ -13,6 +13,8 @@ class NsdHelper(context: Context) {
     
     private val _discoveredIp = MutableStateFlow<String?>(null)
     val discoveredIp: StateFlow<String?> = _discoveredIp
+    
+    private var isDiscoveryRunning = false
 
     private val resolveListener = object : NsdManager.ResolveListener {
         override fun onResolveFailed(serviceInfo: NsdServiceInfo, errorCode: Int) {
@@ -20,7 +22,7 @@ class NsdHelper(context: Context) {
         }
 
         override fun onServiceResolved(serviceInfo: NsdServiceInfo) {
-            Log.e("NsdHelper", "Resolve Succeeded. ${serviceInfo.host.hostAddress}:${serviceInfo.port}")
+            Log.i("NsdHelper", "Resolve Succeeded. ${serviceInfo.host.hostAddress}:${serviceInfo.port}")
             _discoveredIp.value = "http://${serviceInfo.host.hostAddress}:${serviceInfo.port}"
         }
     }
@@ -60,8 +62,11 @@ class NsdHelper(context: Context) {
     }
 
     fun startDiscovery() {
+        if (isDiscoveryRunning) return
+        
         try {
             nsdManager.discoverServices(SERVICE_TYPE, NsdManager.PROTOCOL_DNS_SD, discoveryListener)
+            isDiscoveryRunning = true
         } catch (e: Exception) {
             Log.e("NsdHelper", "Error starting discovery", e)
         }
@@ -70,6 +75,7 @@ class NsdHelper(context: Context) {
     fun stopDiscovery() {
         try {
             nsdManager.stopServiceDiscovery(discoveryListener)
+            isDiscoveryRunning = false
         } catch (e: Exception) {
             Log.e("NsdHelper", "Error stopping discovery", e)
         }

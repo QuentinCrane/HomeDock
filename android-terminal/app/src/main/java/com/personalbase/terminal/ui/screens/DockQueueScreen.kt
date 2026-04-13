@@ -19,6 +19,11 @@
  */
 package com.personalbase.terminal.ui.screens
 
+import android.content.Context
+import android.os.Build
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
@@ -51,6 +56,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -89,6 +95,9 @@ fun DockQueueScreen(
     val baseIp by viewModel.baseIp.collectAsState()
     val syncState by viewModel.syncState.collectAsState()
     val pending by viewModel.pendingCapsules.collectAsState(initial = emptyList())
+    val failedCount by viewModel.failedCount.collectAsState(initial = 0)
+    val hapticEnabled by viewModel.hapticEnabled.collectAsState()
+    val context = LocalContext.current
 
     // Track individual capsule sync states (capsuleId -> syncState)
     // 胶囊同步状态映射：每个胶囊 ID 对应其同步状态
@@ -190,6 +199,15 @@ fun DockQueueScreen(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
+                // Error banner for failed capsules
+                if (failedCount > 0) {
+                    FailedCapsulesBanner(
+                        failedCount = failedCount,
+                        onRetry = { viewModel.retryFailedCapsules() }
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+
                 // Queue count header
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -238,6 +256,9 @@ fun DockQueueScreen(
                                 onShowDetails = {
                                     selectedCapsule = capsule
                                     isBottomSheetVisible = true
+                                },
+                                onRetry = {
+                                    viewModel.retryFailedCapsules()
                                 }
                             )
                         }
@@ -253,6 +274,10 @@ fun DockQueueScreen(
                     baseIp = baseIp,
                     onSync = {
                         if (syncState != "SYNCING" && pending.isNotEmpty() && baseIp != null) {
+                            // Haptic feedback before sync
+                            if (hapticEnabled) {
+                                triggerHapticFeedback(context)
+                            }
                             // Set all capsules to SYNCING state
                             capsuleStates = pending.associate { it.id to "SYNCING" }
                             viewModel.returnToPort()
@@ -378,6 +403,91 @@ private fun ConnectionStatusDot(baseIp: String?, syncState: String) {
             color = dotColor,
             fontSize = 12.sp
         )
+    }
+}
+
+// ============================================================================
+// FAILED CAPSULES BANNER - 同步失败提示横幅
+// 
+// 功能说明：
+// - 当有同步失败的胶囊时显示红色错误提示条
+// - 提供一键重试按钮
+// 
+// 视觉设计：
+// - 深红色背景 + 浅红色文字
+// - 左侧警告图标 + 失败数量
+// - 右侧重试按钮
+// 
+// 用户交互：
+// - 点击重试按钮触发 retryFailedCapsules
+// ============================================================================
+
+@Composable
+private fun FailedCapsulesBanner(
+    failedCount: Int,
+    onRetry: () -> Unit
+) {
+    val infiniteTransition = rememberInfiniteTransition(label = "failed_banner_shake")
+    val shakeOffset by infiniteTransition.animateFloat(
+        initialValue = -2f,
+        targetValue = 2f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(100, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "banner_shake"
+    )
+
+    Surface(
+        shape = RoundedCornerShape(8.dp),
+        color = Color(0xFF991B1B),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier
+                .padding(horizontal = 12.dp, vertical = 10.dp)
+                .offset(x = shakeOffset.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Close,
+                    contentDescription = null,
+                    tint = Color(0xFFFCA5A5),
+                    modifier = Modifier.size(18.dp)
+                )
+                Text(
+                    text = "$failedCount 枚胶囊同步失败",
+                    fontFamily = FontFamily.Monospace,
+                    color = Color(0xFFFCA5A5),
+                    fontSize = 13.sp
+                )
+            }
+            
+            TextButton(
+                onClick = onRetry,
+                colors = ButtonDefaults.textButtonColors(
+                    contentColor = Color(0xFFFCA5A5)
+                ),
+                modifier = Modifier.padding(0.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Refresh,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    text = "重试全部",
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 12.sp
+                )
+            }
+        }
     }
 }
 
@@ -974,7 +1084,8 @@ private fun QueueSwipeToDismissItem(
     capsuleState: String,
     onCapsuleStateChange: (String) -> Unit,
     onDismiss: () -> Unit,
-    onShowDetails: () -> Unit
+    onShowDetails: () -> Unit,
+    onRetry: () -> Unit
 ) {
     var offsetX by remember { mutableStateOf(0f) }
     val dismissThreshold = 200f
@@ -1029,7 +1140,8 @@ private fun QueueSwipeToDismissItem(
             capsule = capsule,
             index = index,
             capsuleState = capsuleState,
-            onShowDetails = onShowDetails
+            onShowDetails = onShowDetails,
+            onRetry = onRetry
         )
     }
 }
@@ -1058,7 +1170,8 @@ private fun QueueAnimatedCapsuleItem(
     capsule: CapsuleEntity,
     index: Int,
     capsuleState: String,
-    onShowDetails: () -> Unit
+    onShowDetails: () -> Unit,
+    onRetry: () -> Unit
 ) {
     var visible by remember { mutableStateOf(false) }
 
@@ -1080,7 +1193,8 @@ private fun QueueAnimatedCapsuleItem(
         QueueCapsuleItem(
             capsule = capsule,
             capsuleState = capsuleState,
-            onShowDetails = onShowDetails
+            onShowDetails = onShowDetails,
+            onRetry = onRetry
         )
     }
 }
@@ -1123,7 +1237,8 @@ private fun QueueAnimatedCapsuleItem(
 private fun QueueCapsuleItem(
     capsule: CapsuleEntity,
     capsuleState: String,
-    onShowDetails: () -> Unit
+    onShowDetails: () -> Unit,
+    onRetry: () -> Unit
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
@@ -1312,7 +1427,7 @@ private fun QueueCapsuleItem(
                     horizontalArrangement = Arrangement.End
                 ) {
                     TextButton(
-                        onClick = { /* Retry this capsule */ },
+                        onClick = onRetry,
                         colors = ButtonDefaults.textButtonColors(
                             contentColor = Color(0xFFEF4444)
                         )
@@ -1464,4 +1579,34 @@ private fun CapsuleStateText(state: String) {
         color = color,
         fontSize = 11.sp
     )
+}
+
+// ============================================================================
+// HAPTIC FEEDBACK HELPER
+// ============================================================================
+
+/**
+ * 触发 haptic 反馈
+ * 根据系统版本选择合适的振动 API
+ */
+@Suppress("DEPRECATION")
+private fun triggerHapticFeedback(context: Context) {
+    try {
+        val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val vibratorManager = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager
+            vibratorManager.defaultVibrator
+        } else {
+            context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+        }
+        
+        if (vibrator.hasVibrator()) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                vibrator.vibrate(VibrationEffect.createOneShot(50, VibrationEffect.DEFAULT_AMPLITUDE))
+            } else {
+                vibrator.vibrate(50)
+            }
+        }
+    } catch (e: Exception) {
+        // 忽略振动失败
+    }
 }

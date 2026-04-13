@@ -39,7 +39,25 @@ interface BaseApi {
 
     @POST("api/todos/sync")
     suspend fun syncTodos(@Body todos: List<TodoSyncItem>): Response<SyncResponse>
+
+    // Organize capsule - archive/wall/echo/delete actions
+    @PUT("api/capsules/{id}/organize")
+    suspend fun organizeCapsule(@Path("id") id: Int, @Body request: OrganizeRequest): Response<OrganizeResponse>
 }
+
+data class OrganizeRequest(
+    val action: String  // 'archive', 'wall', 'echo', 'delete'
+)
+
+data class OrganizeResponse(
+    val success: Boolean,
+    val data: OrganizeData?
+)
+
+data class OrganizeData(
+    val id: Int,
+    val status: String?
+)
 
 data class UploadResponse(
     val success: Boolean,

@@ -13,6 +13,16 @@ function getAudioContext(): AudioContext {
   return audioContext;
 }
 
+// Cleanup function to be called on app unload
+export function closeAudioContext(): void {
+  if (audioContext) {
+    if (audioContext.state !== 'closed') {
+      audioContext.close().catch(() => {});
+    }
+    audioContext = null;
+  }
+}
+
 /**
  * Play a simple tone using Web Audio API
  * @param frequency Frequency in Hz (e.g., 440 for A4)
@@ -74,16 +84,18 @@ export function playNewCapsuleSound(): void {
   setTimeout(() => playTone(698.46, 0.12, 'sine'), 100); // F5
 }
 
+type VibratePattern = number | number[];
+
 /**
  * Trigger vibration if supported and enabled
- * @param pattern Vibration pattern (ms on, ms off, ...) or true for default
+ * @param pattern Vibration pattern (ms on, ms off, ...) - e.g. [30] for short buzz
  */
-export function vibrate(pattern: number[] | boolean = true): void {
+export function vibrate(pattern: VibratePattern = [30]): void {
   if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
     try {
-      navigator.vibrate(pattern as number[]);
+      navigator.vibrate(pattern);
     } catch (e) {
-      console.warn('[Vibration] Failed to vibrate:', e);
+      // Vibration not supported or failed - silently ignore
     }
   }
 }
@@ -125,4 +137,10 @@ export function getVibrationPreference(): boolean {
 export function setVibrationPreference(enabled: boolean): void {
   if (typeof window === 'undefined') return;
   localStorage.setItem('vibration_enabled', String(enabled));
+}
+
+// Cleanup on app unload - remove first to prevent HMR duplicates
+if (typeof window !== 'undefined') {
+  window.removeEventListener('beforeunload', closeAudioContext);
+  window.addEventListener('beforeunload', closeAudioContext);
 }

@@ -47,6 +47,13 @@ const TypeIcon = ({ type }: { type: string }) => {
   }
 };
 
+// Deterministic pseudo-random based on capsule ID (no Math.random)
+const getAudioBarHeight = (index: number, id: number): number => {
+  const seed = id * 1000 + index;
+  const noise = Math.sin(seed * 0.1) * 0.5 + 0.5; // 0-1 range
+  return 20 + noise * 40; // 20-60% height
+};
+
 export const FragmentCard: React.FC<FragmentCardProps> = ({
   capsule,
   onClick,
@@ -164,7 +171,7 @@ export const FragmentCard: React.FC<FragmentCardProps> = ({
                     key={i}
                     className="flex-1 bg-[var(--color-base-accent)]/40 rounded-full"
                     style={{
-                      height: `${20 + Math.sin(i * 0.5 + (capsule.id || 0) * 0.1) * 30 + Math.random() * 20}%`,
+                      height: `${getAudioBarHeight(i, capsule.id || 0)}%`,
                       minHeight: '4px'
                     }}
                   />

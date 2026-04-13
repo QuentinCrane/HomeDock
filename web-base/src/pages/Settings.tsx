@@ -25,7 +25,6 @@ import { useNavigate } from 'react-router-dom';
 import { fetchStatus } from '../api';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  ArrowLeft, 
   Moon, 
   Sun, 
   Monitor,
@@ -43,7 +42,8 @@ import {
   Layers,
   Flame,
   Volume2,
-  Vibrate
+  Vibrate,
+  Palette
 } from 'lucide-react';
 import { 
   getSoundPreference, 
@@ -51,6 +51,7 @@ import {
   getVibrationPreference, 
   setVibrationPreference 
 } from '../sound';
+import { useTheme } from '../context/ThemeContext';
 import dayjs from 'dayjs';
 
 /// 基地信息接口
@@ -117,6 +118,17 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
   onAnimationIntensityChange
 }) => {
   const navigate = useNavigate();
+  
+  // 主题定制 Hook
+  const { 
+    customization, 
+    setPrimaryColor, 
+    setSecondaryColor, 
+    setBackgroundColor, 
+    setSurfaceColor,
+    resetToDefaults
+  } = useTheme();
+  
   const [baseInfo, setBaseInfo] = useState<BaseInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -159,39 +171,63 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
   };
 
   return (
-    <div className="w-full flex-1 min-h-0 flex flex-col relative max-w-6xl mx-auto" style={{ backgroundColor: 'var(--color-base-bg)' }}>
-      {/* 顶栏 */}
-      <div className="flex items-center justify-between mb-6 border-b border-[var(--color-base-border)] pb-4">
-        <button
-          onClick={() => navigate('/')}
-          className="flex items-center gap-2 text-[var(--color-base-text)] hover:text-[var(--color-base-accent)] transition-colors font-mono text-sm tracking-widest uppercase group"
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+      <div className="window-frame w-[640px] max-h-[85vh] overflow-hidden flex flex-col">
+        {/* Title Bar */}
+        <div 
+          className="window-titlebar flex items-center justify-between px-4 py-2.5 select-none"
+          style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
         >
-          <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" />
-          [ 返回基地 ]
-        </button>
-
-        <h2 className="text-xl font-bold text-[var(--color-base-text-bright)] tracking-[0.2em]">
-          设置
-        </h2>
-
-        <div className="w-24"></div>
-      </div>
-
-      {/* 错误提示 */}
-      <AnimatePresence>
-        {error && (
-          <ErrorBanner message={error} onDismiss={() => setError(null)} onRetry={loadBaseInfo} />
-        )}
-      </AnimatePresence>
-
-      {/* 设置内容 */}
-      <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar pb-10">
-        {/* ── 主题设置 ── */}
-        <motion.section 
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mb-8"
+          <div className="flex items-center gap-2.5">
+            <SettingsIcon size={16} className="text-[var(--color-base-accent)]" />
+            <span className="font-mono text-sm text-[var(--color-base-text-bright)]">Settings</span>
+          </div>
+          <div className="flex items-center" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
+            <button 
+              onClick={() => navigate('/')}
+              className="window-control w-9 h-8 flex items-center justify-center hover:bg-white/10 rounded transition-colors"
+              title="Minimize"
+            >
+              <span className="text-xs">─</span>
+            </button>
+            <button 
+              className="window-control w-9 h-8 flex items-center justify-center hover:bg-white/10 rounded transition-colors"
+              title="Maximize"
+            >
+              <span className="text-xs">□</span>
+            </button>
+            <button 
+              onClick={() => navigate('/')}
+              className="window-control w-9 h-8 flex items-center justify-center hover:bg-red-500 rounded transition-colors"
+              title="Close"
+            >
+              <span className="text-xs">✕</span>
+            </button>
+          </div>
+        </div>
+        
+        {/* Content */}
+        <div 
+          className="flex-1 min-h-0 overflow-y-auto custom-scrollbar" 
+          style={{ backgroundColor: 'var(--color-base-bg)' }}
         >
+          {/* 错误提示 */}
+          <div className="p-4 pb-0">
+            <AnimatePresence>
+              {error && (
+                <ErrorBanner message={error} onDismiss={() => setError(null)} onRetry={loadBaseInfo} />
+              )}
+            </AnimatePresence>
+          </div>
+
+          {/* 设置内容 */}
+          <div className="p-4 pt-2">
+            {/* ── 主题设置 ── */}
+            <motion.section 
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mb-6"
+            >
           <div className="flex items-center gap-2 mb-4">
             <Monitor size={14} className="text-[var(--color-base-accent)]" />
             <h3 className="text-sm font-mono text-[var(--color-base-text-bright)] tracking-widest uppercase">
@@ -481,6 +517,133 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
           </div>
         </motion.section>
 
+        {/* ── 颜色定制 ── */}
+        <motion.section 
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.09 }}
+          className="mb-8"
+        >
+          <div className="flex items-center gap-2 mb-4">
+            <Palette size={14} className="text-[var(--color-base-accent)]" />
+            <h3 className="text-sm font-mono text-[var(--color-base-text-bright)] tracking-widest uppercase">
+              颜色定制
+            </h3>
+          </div>
+
+          <div className="bg-[var(--color-base-panel)] border border-[var(--color-base-border)] p-4">
+            <div className="grid grid-cols-2 gap-4">
+              {/* Primary Color */}
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-mono text-[var(--color-base-text)] uppercase tracking-wider">
+                  Primary
+                </label>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="color"
+                    value={customization.primaryColor}
+                    onChange={(e) => setPrimaryColor(e.target.value)}
+                    className="w-10 h-10 rounded cursor-pointer border border-[var(--color-base-border)]"
+                    style={{ backgroundColor: customization.primaryColor }}
+                  />
+                  <input
+                    type="text"
+                    value={customization.primaryColor}
+                    onChange={(e) => setPrimaryColor(e.target.value)}
+                    className="flex-1 px-3 py-2 bg-[var(--color-base-bg)] border border-[var(--color-base-border)] rounded text-xs font-mono text-[var(--color-base-text-bright)] uppercase"
+                    maxLength={7}
+                  />
+                </div>
+              </div>
+
+              {/* Secondary Color */}
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-mono text-[var(--color-base-text)] uppercase tracking-wider">
+                  Secondary
+                </label>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="color"
+                    value={customization.secondaryColor}
+                    onChange={(e) => setSecondaryColor(e.target.value)}
+                    className="w-10 h-10 rounded cursor-pointer border border-[var(--color-base-border)]"
+                    style={{ backgroundColor: customization.secondaryColor }}
+                  />
+                  <input
+                    type="text"
+                    value={customization.secondaryColor}
+                    onChange={(e) => setSecondaryColor(e.target.value)}
+                    className="flex-1 px-3 py-2 bg-[var(--color-base-bg)] border border-[var(--color-base-border)] rounded text-xs font-mono text-[var(--color-base-text-bright)] uppercase"
+                    maxLength={7}
+                  />
+                </div>
+              </div>
+
+              {/* Background Color */}
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-mono text-[var(--color-base-text)] uppercase tracking-wider">
+                  Background
+                </label>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="color"
+                    value={customization.backgroundColor}
+                    onChange={(e) => setBackgroundColor(e.target.value)}
+                    className="w-10 h-10 rounded cursor-pointer border border-[var(--color-base-border)]"
+                    style={{ backgroundColor: customization.backgroundColor }}
+                  />
+                  <input
+                    type="text"
+                    value={customization.backgroundColor}
+                    onChange={(e) => setBackgroundColor(e.target.value)}
+                    className="flex-1 px-3 py-2 bg-[var(--color-base-bg)] border border-[var(--color-base-border)] rounded text-xs font-mono text-[var(--color-base-text-bright)] uppercase"
+                    maxLength={7}
+                  />
+                </div>
+              </div>
+
+              {/* Surface Color */}
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-mono text-[var(--color-base-text)] uppercase tracking-wider">
+                  Surface
+                </label>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="color"
+                    value={customization.surfaceColor}
+                    onChange={(e) => setSurfaceColor(e.target.value)}
+                    className="w-10 h-10 rounded cursor-pointer border border-[var(--color-base-border)]"
+                    style={{ backgroundColor: customization.surfaceColor }}
+                  />
+                  <input
+                    type="text"
+                    value={customization.surfaceColor}
+                    onChange={(e) => setSurfaceColor(e.target.value)}
+                    className="flex-1 px-3 py-2 bg-[var(--color-base-bg)] border border-[var(--color-base-border)] rounded text-xs font-mono text-[var(--color-base-text-bright)] uppercase"
+                    maxLength={7}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Reset Button */}
+            <div className="mt-4 pt-4 border-t border-[var(--color-base-border)] flex justify-end">
+              <button
+                onClick={() => {
+                  if (confirm('确定要将颜色恢复为默认设置吗？')) {
+                    resetToDefaults();
+                  }
+                }}
+                className="px-4 py-2 text-xs font-mono text-[var(--color-base-text)] hover:text-[var(--color-base-error)] transition-colors flex items-center gap-2"
+                title="重置为默认颜色"
+              >
+                <RefreshCw size={12} />
+                重置为默认
+              </button>
+            </div>
+          </div>
+        </motion.section>
+
         {/* ── 基地信息 ── */}
         <motion.section 
           initial={{ opacity: 0, y: 10 }}
@@ -664,6 +827,8 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
             ))}
           </div>
         </motion.section>
+          </div>
+        </div>
       </div>
     </div>
   );

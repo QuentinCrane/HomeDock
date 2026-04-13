@@ -31,15 +31,15 @@ interface TodoDao {
     suspend fun delete(todo: TodoEntity)
 
     // 获取所有待办，按截止日期升序、创建时间降序排列
-    @Query("SELECT * FROM todos ORDER BY dueDate ASC, createdAt DESC")
+    @Query("SELECT * FROM todos ORDER BY dueDate ASC, createdAt DESC LIMIT 100")
     fun getAllTodos(): Flow<List<TodoEntity>>
 
     // 获取未完成的待办，按截止日期升序排列
-    @Query("SELECT * FROM todos WHERE completed = 0 ORDER BY dueDate ASC, createdAt DESC")
+    @Query("SELECT * FROM todos WHERE completed = 0 ORDER BY dueDate ASC, createdAt DESC LIMIT 100")
     fun getActiveTodos(): Flow<List<TodoEntity>>
 
     // 获取已完成的待办，按更新时间降序排列
-    @Query("SELECT * FROM todos WHERE completed = 1 ORDER BY updatedAt DESC")
+    @Query("SELECT * FROM todos WHERE completed = 1 ORDER BY updatedAt DESC LIMIT 100")
     fun getCompletedTodos(): Flow<List<TodoEntity>>
 
     // 根据本地ID查询待办（用于同步时查找对应项）

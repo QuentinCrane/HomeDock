@@ -35,5 +35,7 @@ data class TodoEntity(
     // 最后同步到服务器的时间戳
     val syncedAt: Long? = null,
     // 关联的日历事件ID（用于日历集成）
-    val calendarEventId: String? = null
+    val calendarEventId: String? = null,
+    // 重要性等级（1-5星，0 = 未设置）
+    val importance: Int = 0
 )

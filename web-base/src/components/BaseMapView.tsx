@@ -58,6 +58,8 @@ interface BaseMapViewProps {
   isOpen?: boolean;
   /** Callback when modal is closed */
   onClose?: () => void;
+  /** Trigger pulse animation when new capsule arrives */
+  newCapsulePulse?: boolean;
 }
 
 interface ColorPalette {
@@ -144,14 +146,18 @@ export const BaseMapView: React.FC<BaseMapViewProps> = ({
   isModal = false,
   isOpen = false,
   onClose,
+  newCapsulePulse = false,
 }) => {
+  // Pulse animation state for new capsule arrivals
+  const [pulseActive, setPulseActive] = useState(false);
+
   // Auto-detect theme from document attribute if not provided
   const [detectedTheme, setDetectedTheme] = useState<'day' | 'night'>(() => {
     const docTheme = document.documentElement.getAttribute('data-theme');
     return docTheme === 'day' ? 'day' : 'night';
   });
 
-  // Listen for theme changes
+  // Listen for theme changes via MutationObserver
   useEffect(() => {
     const observer = new MutationObserver((mutations) => {
       mutations.forEach((mutation) => {
@@ -164,17 +170,19 @@ export const BaseMapView: React.FC<BaseMapViewProps> = ({
 
     observer.observe(document.documentElement, { attributes: true });
 
-    // Also poll periodically as fallback
-    const interval = setInterval(() => {
-      const currentTheme = document.documentElement.getAttribute('data-theme');
-      setDetectedTheme(currentTheme === 'day' ? 'day' : 'night');
-    }, 500);
-
     return () => {
       observer.disconnect();
-      clearInterval(interval);
     };
   }, []);
+
+  // Handle pulse animation when new capsule arrives
+  useEffect(() => {
+    if (newCapsulePulse) {
+      setPulseActive(true);
+      const timer = setTimeout(() => setPulseActive(false), 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [newCapsulePulse]);
 
   // Use provided theme or auto-detected
   const effectiveTheme = theme ?? detectedTheme;
@@ -225,14 +233,30 @@ export const BaseMapView: React.FC<BaseMapViewProps> = ({
           </filter>
 
           {/* Subtle glow for idle rooms */}
-          <filter id="idleGlow" x="-50%" y="-50%" width="200%" height="200%">
-            <feGaussianBlur stdDeviation="1" result="blur" />
+          {/* Pulse glow filter for new capsule arrivals */}
+          <filter id="pulseGlow" x="-100%" y="-100%" width="300%" height="300%">
+            <feGaussianBlur stdDeviation="3" result="blur" />
             <feMerge>
               <feMergeNode in="blur" />
               <feMergeNode in="SourceGraphic" />
             </feMerge>
           </filter>
         </defs>
+
+        {/* Pulse overlay when new capsule arrives */}
+        {pulseActive && (
+          <rect
+            x="0"
+            y="0"
+            width="100"
+            height="100"
+            fill="none"
+            stroke={colors.accent}
+            strokeWidth="0.5"
+            opacity="0.5"
+            className="animate-pulse"
+          />
+        )}
 
         {/* Background structure */}
         <rect
@@ -261,10 +285,16 @@ export const BaseMapView: React.FC<BaseMapViewProps> = ({
         />
 
         {/* === Launch Bay (Left) === */}
-        <g
+        <motion.g
           className="map-room"
           onClick={() => handleRoomClick('launch')}
           filter={activeRoom === 'launch' ? 'url(#roomGlow)' : undefined}
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1, duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+          whileHover={{ scale: 1.04, filter: activeRoom === 'launch' ? undefined : 'url(#roomGlow)' }}
+          whileTap={{ scale: 0.97 }}
+          style={{ transformOrigin: `${leftRoomX + 13}px ${mainY + 15}px` }}
         >
           {/* Room background */}
           <rect
@@ -317,27 +347,33 @@ export const BaseMapView: React.FC<BaseMapViewProps> = ({
           >
             {roomsWithStatus[0].capsuleCount > 0 ? `${roomsWithStatus[0].capsuleCount}` : ''}
           </text>
-          {/* Active indicator pulse - CSS animated */}
+          {/* Active indicator pulse - Framer Motion */}
           {(activeRoom === 'launch' || roomsWithStatus[0].status === 'active') && (
-            <g className="animate-pulse-ring-svg" style={{ transformOrigin: `${leftRoomX + 13}px ${mainY + 15}px` }}>
-              <circle
-                cx={leftRoomX + 13}
-                cy={mainY + 15}
-                r="6"
-                fill="none"
-                stroke={getRoomColor(roomsWithStatus[0].status, activeRoom === 'launch', colors)}
-                strokeWidth="0.5"
-                opacity="0.6"
-              />
-            </g>
+            <motion.circle
+              cx={leftRoomX + 13}
+              cy={mainY + 15}
+              r="6"
+              fill="none"
+              stroke={getRoomColor(roomsWithStatus[0].status, activeRoom === 'launch', colors)}
+              strokeWidth="0.5"
+              initial={{ scale: 0.8, opacity: 0.6 }}
+              animate={{ scale: [0.8, 1.4, 2], opacity: [0.6, 0.25, 0] }}
+              transition={{ duration: 2, repeat: Infinity, ease: 'easeOut' }}
+            />
           )}
-        </g>
+        </motion.g>
 
         {/* === Main Workstation (Center) === */}
-        <g
+        <motion.g
           className="map-room"
           onClick={() => handleRoomClick('workstation')}
           filter={activeRoom === 'workstation' ? 'url(#roomGlow)' : undefined}
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2, duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+          whileHover={{ scale: 1.04, filter: activeRoom === 'workstation' ? undefined : 'url(#roomGlow)' }}
+          whileTap={{ scale: 0.97 }}
+          style={{ transformOrigin: `${centerRoomX + 12}px ${mainY + 14}px` }}
         >
           {/* Room background */}
           <rect
@@ -408,27 +444,33 @@ export const BaseMapView: React.FC<BaseMapViewProps> = ({
           >
             {roomsWithStatus[1].capsuleCount > 0 ? `${roomsWithStatus[1].capsuleCount}` : ''}
           </text>
-          {/* Active indicator pulse - CSS animated */}
+          {/* Active indicator pulse - Framer Motion */}
           {(activeRoom === 'workstation' || roomsWithStatus[1].status === 'active') && (
-            <g className="animate-pulse-ring-svg" style={{ transformOrigin: `${centerRoomX + 12}px ${mainY + 14}px` }}>
-              <circle
-                cx={centerRoomX + 12}
-                cy={mainY + 14}
-                r="6"
-                fill="none"
-                stroke={getRoomColor(roomsWithStatus[1].status, activeRoom === 'workstation', colors)}
-                strokeWidth="0.5"
-                opacity="0.6"
-              />
-            </g>
+            <motion.circle
+              cx={centerRoomX + 12}
+              cy={mainY + 14}
+              r="6"
+              fill="none"
+              stroke={getRoomColor(roomsWithStatus[1].status, activeRoom === 'workstation', colors)}
+              strokeWidth="0.5"
+              initial={{ scale: 0.8, opacity: 0.6 }}
+              animate={{ scale: [0.8, 1.4, 2], opacity: [0.6, 0.25, 0] }}
+              transition={{ duration: 2, repeat: Infinity, ease: 'easeOut' }}
+            />
           )}
-        </g>
+        </motion.g>
 
         {/* === Auxiliary Cabin (Right) === */}
-        <g
+        <motion.g
           className="map-room"
           onClick={() => handleRoomClick('aux')}
           filter={activeRoom === 'aux' ? 'url(#roomGlow)' : undefined}
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3, duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+          whileHover={{ scale: 1.04, filter: activeRoom === 'aux' ? undefined : 'url(#roomGlow)' }}
+          whileTap={{ scale: 0.97 }}
+          style={{ transformOrigin: `${rightRoomX + 12}px ${mainY + 15}px` }}
         >
           {/* Room background */}
           <rect
@@ -491,27 +533,33 @@ export const BaseMapView: React.FC<BaseMapViewProps> = ({
           >
             {roomsWithStatus[2].capsuleCount > 0 ? `${roomsWithStatus[2].capsuleCount}` : ''}
           </text>
-          {/* Active indicator pulse - CSS animated */}
+          {/* Active indicator pulse - Framer Motion */}
           {(activeRoom === 'aux' || roomsWithStatus[2].status === 'active') && (
-            <g className="animate-pulse-ring-svg" style={{ transformOrigin: `${rightRoomX + 12}px ${mainY + 15}px` }}>
-              <circle
-                cx={rightRoomX + 12}
-                cy={mainY + 15}
-                r="6"
-                fill="none"
-                stroke={getRoomColor(roomsWithStatus[2].status, activeRoom === 'aux', colors)}
-                strokeWidth="0.5"
-                opacity="0.6"
-              />
-            </g>
+            <motion.circle
+              cx={rightRoomX + 12}
+              cy={mainY + 15}
+              r="6"
+              fill="none"
+              stroke={getRoomColor(roomsWithStatus[2].status, activeRoom === 'aux', colors)}
+              strokeWidth="0.5"
+              initial={{ scale: 0.8, opacity: 0.6 }}
+              animate={{ scale: [0.8, 1.4, 2], opacity: [0.6, 0.25, 0] }}
+              transition={{ duration: 2, repeat: Infinity, ease: 'easeOut' }}
+            />
           )}
-        </g>
+        </motion.g>
 
         {/* === Return Trace (Bottom) === */}
-        <g
+        <motion.g
           className="map-room"
           onClick={() => handleRoomClick('trace')}
           filter={activeRoom === 'trace' ? 'url(#roomGlow)' : undefined}
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4, duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+          whileHover={{ scale: 1.02, filter: activeRoom === 'trace' ? undefined : 'url(#roomGlow)' }}
+          whileTap={{ scale: 0.98 }}
+          style={{ transformOrigin: `${leftRoomX + 30}px ${traceY + 7}px` }}
         >
           {/* Room background - full width strip at bottom */}
           <rect
@@ -538,13 +586,18 @@ export const BaseMapView: React.FC<BaseMapViewProps> = ({
           />
           {/* Trace dots representing recent activity */}
           {[0, 1, 2, 3, 4].map((i) => (
-            <circle
+            <motion.circle
               key={i}
               cx={leftRoomX + 10 + i * 10}
               cy={traceY + 7}
               r="1.2"
               fill={getRoomColor(roomsWithStatus[3].status, activeRoom === 'trace', colors)}
               fillOpacity={0.3 + (i * 0.15)}
+              animate={roomsWithStatus[3].status === 'active' || activeRoom === 'trace' ? {
+                scale: [1, 1.4, 1],
+                opacity: [0.3 + (i * 0.15), 0.6 + (i * 0.15), 0.3 + (i * 0.15)]
+              } : {}}
+              transition={{ duration: 1.5 + (i * 0.1), repeat: Infinity, ease: 'easeInOut' }}
             />
           ))}
           {/* Room label */}
@@ -558,21 +611,21 @@ export const BaseMapView: React.FC<BaseMapViewProps> = ({
           >
             {roomsWithStatus[3].nameCn}
           </text>
-          {/* Active indicator pulse - CSS animated */}
+          {/* Active indicator pulse - Framer Motion */}
           {(activeRoom === 'trace' || roomsWithStatus[3].status === 'active') && (
-            <g className="animate-pulse-ring-svg-trace" style={{ transformOrigin: `${leftRoomX + 30}px ${traceY + 7}px` }}>
-              <circle
-                cx={leftRoomX + 30}
-                cy={traceY + 7}
-                r="5"
-                fill="none"
-                stroke={getRoomColor(roomsWithStatus[3].status, activeRoom === 'trace', colors)}
-                strokeWidth="0.5"
-                opacity="0.6"
-              />
-            </g>
+            <motion.circle
+              cx={leftRoomX + 30}
+              cy={traceY + 7}
+              r="5"
+              fill="none"
+              stroke={getRoomColor(roomsWithStatus[3].status, activeRoom === 'trace', colors)}
+              strokeWidth="0.5"
+              initial={{ scale: 0.7, opacity: 0.6 }}
+              animate={{ scale: [0.7, 1.5, 2.2], opacity: [0.6, 0.2, 0] }}
+              transition={{ duration: 2.5, repeat: Infinity, ease: 'easeOut' }}
+            />
           )}
-        </g>
+        </motion.g>
 
         {/* Connection lines between rooms */}
         <line

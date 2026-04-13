@@ -24,6 +24,12 @@ app.use('/uploads', express.static(path.resolve(__dirname, '../../uploads')));
 // API Routes
 app.use('/api', routes);
 
+// Health check endpoint
+app.get('/api/health', (req, res) => {
+  console.log('[主基地] Health check');
+  res.json({ success: true, data: { status: 'ok', timestamp: Date.now() } });
+});
+
 // SSE endpoint for real-time events
 app.get('/api/events', handleSSEConnection);
 

@@ -45,7 +45,7 @@
 
 - 宿舍或房间里的一个私人基地
 - 一个只存在于局域网里的小系统
-- 一个带有“回港”仪式感的离线玩具
+- 一个带有"回港"仪式感的离线玩具
 
 ---
 
@@ -63,7 +63,7 @@
 - 没有云同步
 - 没有互联网依赖
 - 没有数据外流
-- 默认不把内容“上传到别处”
+- 默认不把内容"上传到别处"
 
 它更关注的是：
 
@@ -76,7 +76,7 @@
 
 ## 🔄 核心体验
 
-归航 的核心动作不是普通意义上的“上传”，而是：
+归航 的核心动作不是普通意义上的"上传"，而是：
 
 > **回港 / Return to Dock**
 
@@ -94,7 +94,7 @@
 6. 看着这些内容回到你的 Web Base
 7. 在桌面端继续查看、整理、归档和回看
 
-这条“回港”链路就是整个项目最重要的体验。
+这条"回港"链路就是整个项目最重要的体验。
 
 ---
 
@@ -117,6 +117,7 @@
   - 档案馆
   - 待办
   - 设置
+  - 基地地图（可视化）
 
 ### 📱 Android Terminal / 回港终端
 
@@ -127,7 +128,7 @@
 - 采集胶囊
 - 本地离线存储
 - 在局域网中发现基地
-- 发起“回港”同步
+- 发起"回港"同步
 - 维护待回港队列
 
 当前支持的胶囊类型：
@@ -144,13 +145,18 @@
 
 - 📡 基于 mDNS / NSD 的局域网自动发现
 - 📦 Android 本地离线优先队列
-- 🔄 一键“回港”同步
+- 🔄 一键"回港"同步
 - 🧱 用于浏览回港内容的碎片墙
 - 🎧 支持文字 / 图片 / 音频胶囊
-- 🗂️ 用于浏览和管理内容的档案馆
+- 🗂 用于浏览和管理内容的档案馆
 - 📝 待办页面
+- 🗺️ 基地地图（胶囊分布可视化）
+- 🔔 连接状态指示器
 - ⚙️ 设置页面
 - 🌙 主题支持（白天 / 夜间 / 自动，具体以当前实现为准）
+- 🤫 **静默模式** - 一种极简暗色模式，禁用所有动画并降低视觉噪音。适合深度工作或需要更平静界面的场景。通过顶部导航栏切换。
+- 🗑️ 回收站（删除内容管理）
+- 📋 待整理队列
 
 ### 体验目标
 
@@ -158,7 +164,7 @@
 - 不依赖云
 - 数据由自己掌握
 - 同步体验更有仪式感
-- 双端交互像是“把东西带回家”
+- 双端交互像是"把东西带回家"
 
 ---
 
@@ -168,14 +174,14 @@
   <img src="./assets/home.png" width="45%" />
   <img src="./assets/echo.png" width="45%" />
   <img src="./assets/wall.png" width="45%" />
-  <img src="./assets/wall.png" width="45%" />
+  <img src="./assets/todo.png" width="45%" />
   <img src="./assets/archive.png" width="45%" />
   <img src="./assets/night.png" width="45%" />
-  <img src="./assets/phone-home.png" width="30%" />
-  <img src="./assets/phone-submit.png" width="30%" />
-  <img src="./assets/phone-capsule.png" width="30%" />
+  <img src="./assets/phone-home.png" width="20%" />
+  <img src="./assets/phone-submit.png" width="20%" />
+  <img src="./assets/phone-capsule.png" width="20%" />
+  <img src="./assets/phone-todo.png" width="20%" />
 </p>
-
 
 ---
 
@@ -187,22 +193,25 @@
 
 ### Web 技术栈
 
-- React
-- Vite
-- Node.js
-- Express
+- React 19 + Vite 8
+- Node.js + Express 5
 - SQLite
-- Tailwind CSS
-- Framer Motion
+- Tailwind CSS 4 + Framer Motion 12
+- ECharts 5 + echarts-for-react
+- React Router 7
+- Axios, Multer, Bonjour-service, dayjs, Lucide icons
 
 ### Android 技术栈
 
-- Kotlin
-- Jetpack Compose
+- Kotlin + Jetpack Compose
 - Material 3
-- Room
-- Retrofit
+- Room（本地数据库）
+- Retrofit + OkHttp（网络请求）
+- CameraX（相机拍摄）
+- Coil（图片加载）
 - NSD / mDNS discovery
+- Accompanist（权限处理）
+- Min SDK 26 / Target SDK 34 / JVM 17
 
 ### 网络 / 同步
 
@@ -218,14 +227,61 @@
 .
 ├── web-base/
 │   ├── server/
+│   │   ├── db.ts          # SQLite 连接与查询
+│   │   ├── events.ts     # SSE 事件处理
+│   │   ├── index.ts      # Express 入口
+│   │   ├── nsd.ts        # Bonjour/mDNS 广播
+│   │   └── routes.ts     # API 路由
 │   ├── src/
-│   └── package.json
+│   │   ├── components/    # 20+ React 组件
+│   │   │   ├── charts/   # ECharts 封装
+│   │   │   ├── context/  # React Context
+│   │   │   └── hooks/    # 自定义 Hooks (useSSE, useToast, useConnectionStatus)
+│   │   ├── pages/        # 6 个页面：Archive, Echo, Home, Settings, Todos, Wall
+│   │   └── ...
+│   ├── package.json
+│   └── vite.config.ts
 ├── android-terminal/
-│   ├── app/
-│   └── build.gradle
-├── README.md
-└── README.zh-CN.md
+│   ├── app/src/main/java/com/personalbase/terminal/
+│   │   ├── data/         # Room：Database, DAOs, Entities, Repository
+│   │   ├── nsd/          # NsdHelper（mDNS 发现）
+│   │   ├── ui/
+│   │   │   ├── screens/  # 8 个 Compose 页面
+│   │   │   └── Theme.kt
+│   │   └── ...
+│   └── build.gradle.kts
+├── assets/
+│   ├── TECHNICAL_ROUTE.md
+│   └── screenshots/
+└── README.md
 ```
+
+---
+
+## 🔧 前置要求
+
+在开始之前，请确保已安装以下工具：
+
+### Web Base 环境
+
+| 依赖 | 版本 | 备注 |
+|------|------|------|
+| **Node.js** | ≥ 18 推荐 | [下载地址](https://nodejs.org/) |
+| **npm** | 随 Node.js 附带 | 或使用 `pnpm` / `yarn` |
+
+### Android Terminal 环境
+
+| 依赖 | 版本 | 备注 |
+|------|------|------|
+| **Android Studio** | 最新稳定版 | [下载地址](https://developer.android.com/studio) |
+| **JDK** | 17 | 随 Android Studio 附带 |
+| **Android 设备** | SDK 26+ (Android 8.0) | 真机推荐，模拟器无法接收主机 mDNS 广播 |
+| **Gradle** | 随 Android Studio 附带 | 自动安装 |
+
+### 完整链路测试
+
+- 电脑和手机处于**同一局域网 / Wi-Fi** 下
+- （NSD 功能）建议使用真机测试 —— 模拟器无法发现主机发出的 mDNS 广播
 
 ---
 
@@ -239,21 +295,24 @@ npm install
 npm run dev
 ```
 
-这会启动本地主基地，包括前端与后端开发服务。
+这会启动：
+- **前端**：Vite 开发服务器 `http://localhost:5173`
+- **后端**：Express API `http://localhost:3000`
 
 ### 2. 启动 Android Terminal
 
 1. 使用 Android Studio 打开 `android-terminal`
-2. 连接一台真机
-3. 确保手机和电脑处于同一个 Wi-Fi / 局域网
+2. 同步 Gradle
+3. 连接一台真机（确保与电脑在同一 Wi-Fi 下）
 4. 运行 App
 
 ### 3. 体验完整流程
 
-- 在 Android 端创建一个胶囊
-- 等待发现基地
+- 在 Android 端创建一个胶囊（文字 / 图片 / 音频）
+- 等待 mDNS 发现基地
 - 点击 **回港**
-- 在 Web Base 里查看新内容
+- 看着内容回到 Web Base
+- 在桌面端浏览、整理或归档
 
 ---
 
@@ -288,7 +347,7 @@ npm run dev
 
 ### 3. 仪式感优先于普通同步
 
-“回港”不只是传输动作，它本身就是体验的一部分。
+"回港"不只是传输动作，它本身就是体验的一部分。
 
 ### 4. 默认私有
 
@@ -359,10 +418,10 @@ npm run dev
 
 ## 🌀 最后
 
-归航 并不是一个“必须存在”的工具。
+归航 并不是一个"必须存在"的工具。
 
 它更像是一种尝试：即使没有互联网，
 
 > 你仍然可以拥有一个只属于自己的小系统。
 
-希望能有有想法的同志一起为这个项目贡献一些力量:D
+希望能有有想法的同志一起为这个项目贡献一些力量 :D

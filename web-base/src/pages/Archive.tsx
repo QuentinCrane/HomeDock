@@ -20,24 +20,20 @@
  *   - grouped: 按日期分组的胶囊
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { Capsule, CapsuleStatus } from '../api';
-import { fetchCapsules, updateCapsule, deleteCapsule, restoreCapsule } from '../api';
+import { fetchCapsules, updateCapsule, deleteCapsule, restoreCapsule, emptyTrash, permanentDeleteCapsule } from '../api';
 import dayjs from 'dayjs';
 import { 
   ArrowLeft, Edit3, Trash2, RotateCcw, Archive, Heart, FileText, Check, X, 
-  Search, Clock, Image, Music, Star, Layers, FolderOpen, 
+  Search, Image, Music, FolderOpen, 
   Folder, ArchiveIcon
 } from 'lucide-react';
 
-/// 时间筛选类型
-type TimeFilter = 'all' | 'today' | 'week' | 'older';
-/// 类型筛选类型
-type TypeFilter = 'all' | 'text' | 'image' | 'audio';
-/// 状态筛选类型
-type StatusFilter = 'all' | 'draft' | 'archived' | 'favorited';
+/// 简化筛选类型 - 档案柜索引
+type ArchiveFilter = 'recent' | 'week' | 'older' | 'text' | 'image' | 'audio' | 'draft' | 'archived' | 'favorited' | 'trash';
 
 /// 状态配置 - 使用 CSS 变量适配日/夜间模式
 const statusConfig: Record<string, { label: string; color: string; bgColor: string; dotColor: string }> = {
@@ -51,6 +47,28 @@ const statusConfig: Record<string, { label: string; color: string; bgColor: stri
 const getStatusStyle = (status: CapsuleStatus | undefined) => {
   return statusConfig[status || 'pending'] || statusConfig.pending;
 };
+
+/// 筛选抽屉组件 - 档案柜索引项
+interface FilterItemProps {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}
+
+const FilterItem: React.FC<FilterItemProps> = ({ active, onClick, children }) => (
+  <button
+    onClick={onClick}
+    className="w-full flex items-center gap-2 px-3 py-2 text-xs font-mono transition-all rounded-md"
+    style={{
+      backgroundColor: active ? 'rgba(74, 122, 155, 0.15)' : 'transparent',
+      color: active ? 'var(--color-base-accent)' : 'var(--color-base-text-light)',
+      borderLeft: active ? '2px solid var(--color-base-accent)' : '2px solid transparent'
+    }}
+  >
+    <span className="text-[10px] opacity-60">{active ? '◈' : '▸'}</span>
+    <span>{children}</span>
+  </button>
+);
 
 const typeIcons = {
   text: FileText,
@@ -69,14 +87,13 @@ const ArchivePage: React.FC = () => {
   const navigate = useNavigate();
   const [capsules, setCapsules] = useState<Capsule[]>([]);
   const [loading, setLoading] = useState(true);
-  const [timeFilter, setTimeFilter] = useState<TimeFilter>('all');
-  const [typeFilter, setTypeFilter] = useState<TypeFilter>('all');
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [filter, setFilter] = useState<ArchiveFilter>('recent');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCapsule, setSelectedCapsule] = useState<Capsule | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [showEmptyTrashDialog, setShowEmptyTrashDialog] = useState(false);
 
   const loadCapsules = async () => {
     setLoading(true);
@@ -93,35 +110,69 @@ const ArchivePage: React.FC = () => {
     loadCapsules();
   }, []);
 
-  const filtered = capsules.filter(cap => {
-    // 显示所有非草稿状态且未彻底删除的胶囊（包括 pending、archived、favorited）
-    const matchesArchiveStatus = cap.status !== 'draft' && !cap.deletedAt;
-    if (!matchesArchiveStatus) return false;
+  const filtered = useMemo(() => capsules.filter(cap => {
+    // Trash filter: show only deleted capsules
+    if (filter === 'trash') {
+      if (!cap.deletedAt) return false;
+    } else {
+      // Non-trash filters: hide deleted capsules
+      if (cap.deletedAt) return false;
+    }
 
     const capDate = dayjs(cap.timestamp);
     const now = dayjs();
-    const matchesTime = timeFilter === 'all' ||
-      (timeFilter === 'today' && capDate.isSame(now, 'day')) ||
-      (timeFilter === 'week' && capDate.isSame(now, 'week')) ||
-      (timeFilter === 'older' && capDate.isBefore(now.startOf('week')));
-    const matchesType = typeFilter === 'all' || cap.type === typeFilter;
-    const matchesStatus = statusFilter === 'all' ||
-      (statusFilter === 'draft' && cap.status === 'draft') ||
-      (statusFilter === 'archived' && cap.status === 'archived') ||
-      (statusFilter === 'favorited' && cap.status === 'favorited') ||
-      (statusFilter === 'draft' && !!cap.deletedAt);
+
+    // 简化筛选逻辑 - 单维度筛选
+    switch (filter) {
+      case 'recent':
+        // 最近 - 显示所有（仅受搜索影响）
+        break;
+      case 'week':
+        // 本周
+        if (!capDate.isSame(now, 'week')) return false;
+        break;
+      case 'older':
+        // 更早 - 本周之前的
+        if (!capDate.isBefore(now.startOf('week'))) return false;
+        break;
+      case 'text':
+        if (cap.type !== 'text') return false;
+        break;
+      case 'image':
+        if (cap.type !== 'image') return false;
+        break;
+      case 'audio':
+        if (cap.type !== 'audio') return false;
+        break;
+      case 'draft':
+        if (cap.status !== 'draft') return false;
+        break;
+      case 'archived':
+        if (cap.status !== 'archived') return false;
+        break;
+      case 'favorited':
+        if (cap.status !== 'favorited') return false;
+        break;
+      case 'trash':
+        // Already handled above
+        break;
+    }
+
     const matchesSearch = searchQuery === '' ||
       (cap.content?.toLowerCase().includes(searchQuery.toLowerCase())) ||
       cap.id.toString().includes(searchQuery);
-    return matchesTime && matchesType && matchesStatus && matchesSearch;
-  });
+    return matchesSearch;
+  }), [capsules, filter, searchQuery]);
 
-  const grouped: Record<string, Capsule[]> = {};
-  filtered.forEach(cap => {
-    const dateKey = dayjs(cap.timestamp).format('YYYY.MM.DD');
-    if (!grouped[dateKey]) grouped[dateKey] = [];
-    grouped[dateKey].push(cap);
-  });
+  const grouped = useMemo(() => {
+    const result: Record<string, Capsule[]> = {};
+    filtered.forEach(cap => {
+      const dateKey = dayjs(cap.timestamp).format('YYYY.MM.DD');
+      if (!result[dateKey]) result[dateKey] = [];
+      result[dateKey].push(cap);
+    });
+    return result;
+  }, [filtered]);
 
   const handleSelectCapsule = (cap: Capsule) => {
     setSelectedCapsule(cap);
@@ -175,6 +226,29 @@ const ArchivePage: React.FC = () => {
     }
   };
 
+  const handlePermanentDelete = async () => {
+    if (!selectedCapsule || !confirm('确定要永久删除这个档案吗？此操作不可恢复。')) return;
+    try {
+      await permanentDeleteCapsule(selectedCapsule.id);
+      loadCapsules();
+      setSelectedCapsule(null);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleEmptyTrash = async () => {
+    if (!confirm('确定要清空回收站吗？所有已删除的档案将被永久删除，此操作不可恢复。')) return;
+    try {
+      await emptyTrash();
+      setShowEmptyTrashDialog(false);
+      loadCapsules();
+      setSelectedCapsule(null);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   return (
     <div className="w-full flex-1 min-h-0 flex flex-col relative" style={{ backgroundColor: 'var(--color-base-bg)' }}>
 
@@ -202,10 +276,10 @@ const ArchivePage: React.FC = () => {
       </div>
 
       {/* Main: 3-column layout */}
-      <div className="flex-1 flex gap-4 overflow-hidden">
+      <div className="flex-1 min-h-0 flex gap-4 overflow-hidden">
 
         {/* ── Left: Archive Directory (220px) ── */}
-        <div className="w-[220px] flex-shrink-0 flex flex-col overflow-y-auto custom-scrollbar rounded-lg"
+        <div className="w-[220px] flex-shrink-0 flex flex-col overflow-hidden rounded-lg"
              style={{ backgroundColor: 'var(--color-base-panel)', border: '1px solid var(--color-base-border)/30' }}>
           
           {/* Header */}
@@ -214,103 +288,45 @@ const ArchivePage: React.FC = () => {
               <FolderOpen size={16} className="text-[var(--color-base-accent)]" />
               <span className="text-[10px] font-mono text-[var(--color-base-text-bright)] tracking-widest uppercase font-medium">档案柜</span>
             </div>
-            <div className="text-[9px] font-mono text-[var(--color-base-text)] opacity-30 mt-1 ml-6 tracking-wider">
-              索引目录
-            </div>
           </div>
 
-          {/* Time filter */}
-          <div className="p-3">
-            <div className="flex items-center gap-2 mb-2 px-2">
-              <Clock size={10} className="text-[var(--color-base-text)] opacity-50" />
-              <span className="text-[9px] font-mono text-[var(--color-base-text)] opacity-50 tracking-widest uppercase">时间</span>
-            </div>
-            <div className="space-y-0.5 ml-2">
-              {([
-                { key: 'all' as TimeFilter, label: '全部档案', icon: '◈' },
-                { key: 'today' as TimeFilter, label: '今日', icon: '▸' },
-                { key: 'week' as TimeFilter, label: '本周', icon: '▸' },
-                { key: 'older' as TimeFilter, label: '更早', icon: '▸' },
-              ]).map(({ key, label, icon }) => (
-                <button
-                  key={key}
-                  onClick={() => setTimeFilter(key)}
-                  className="w-full flex items-center gap-2 px-3 py-2 text-xs font-mono transition-all rounded-md"
-                  style={{
-                    backgroundColor: timeFilter === key ? 'rgba(74, 122, 155, 0.15)' : 'transparent',
-                    color: timeFilter === key ? 'var(--color-base-accent)' : 'var(--color-base-text-light)',
-                    borderLeft: timeFilter === key ? '2px solid var(--color-base-accent)' : '2px solid transparent'
-                  }}
-                >
-                  <span className="text-[10px] opacity-60">{icon}</span>
-                  <span>{label}</span>
-                </button>
-              ))}
-            </div>
+          {/* Filter label */}
+          <div className="px-4 pt-3 pb-2">
+            <span className="text-[9px] font-mono text-[var(--color-base-text)] opacity-40 tracking-widest uppercase">
+              索引
+            </span>
           </div>
 
-          {/* Type filter */}
-          <div className="p-3 pt-0">
-            <div className="flex items-center gap-2 mb-2 px-2">
-              <Layers size={10} className="text-[var(--color-base-text)] opacity-50" />
-              <span className="text-[9px] font-mono text-[var(--color-base-text)] opacity-50 tracking-widest uppercase">类型</span>
-            </div>
-            <div className="space-y-0.5 ml-2">
-              {([
-                { key: 'all' as TypeFilter, label: '全部', icon: '◈' },
-                { key: 'text' as TypeFilter, label: '文字', icon: '▸' },
-                { key: 'image' as TypeFilter, label: '图片', icon: '▸' },
-                { key: 'audio' as TypeFilter, label: '音频', icon: '▸' },
-              ]).map(({ key, label, icon }) => (
-                <button
-                  key={key}
-                  onClick={() => setTypeFilter(key)}
-                  className="w-full flex items-center gap-2 px-3 py-2 text-xs font-mono transition-all rounded-md"
-                  style={{
-                    backgroundColor: typeFilter === key ? 'rgba(74, 122, 155, 0.15)' : 'transparent',
-                    color: typeFilter === key ? 'var(--color-base-accent)' : 'var(--color-base-text-light)',
-                    borderLeft: typeFilter === key ? '2px solid var(--color-base-accent)' : '2px solid transparent'
-                  }}
-                >
-                  <span className="text-[10px] opacity-60">{icon}</span>
-                  <span>{label}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Status filter */}
-          <div className="p-3 pt-0">
-            <div className="flex items-center gap-2 mb-2 px-2">
-              <Star size={10} className="text-[var(--color-base-text)] opacity-50" />
-              <span className="text-[9px] font-mono text-[var(--color-base-text)] opacity-50 tracking-widest uppercase">状态</span>
-            </div>
-            <div className="space-y-0.5 ml-2">
-              {([
-                { key: 'all' as StatusFilter, label: '全部', icon: '◈' },
-                { key: 'draft' as StatusFilter, label: '草稿', icon: '▸' },
-                { key: 'archived' as StatusFilter, label: '已归档', icon: '▸' },
-                { key: 'favorited' as StatusFilter, label: '收藏', icon: '▸' },
-              ]).map(({ key, label, icon }) => (
-                <button
-                  key={key}
-                  onClick={() => setStatusFilter(key)}
-                  className="w-full flex items-center gap-2 px-3 py-2 text-xs font-mono transition-all rounded-md"
-                  style={{
-                    backgroundColor: statusFilter === key ? 'rgba(74, 122, 155, 0.15)' : 'transparent',
-                    color: statusFilter === key ? 'var(--color-base-accent)' : 'var(--color-base-text-light)',
-                    borderLeft: statusFilter === key ? '2px solid var(--color-base-accent)' : '2px solid transparent'
-                  }}
-                >
-                  <span className="text-[10px] opacity-60">{icon}</span>
-                  <span>{label}</span>
-                </button>
-              ))}
-            </div>
-          </div>
+          {/* Flat filter list */}
+          <nav className="flex-1 min-h-0 overflow-y-auto custom-scrollbar px-3 pb-3 space-y-0.5">
+            <FilterItem active={filter === 'recent'} onClick={() => setFilter('recent')}>最近</FilterItem>
+            <FilterItem active={filter === 'week'} onClick={() => setFilter('week')}>本周</FilterItem>
+            <FilterItem active={filter === 'older'} onClick={() => setFilter('older')}>更早</FilterItem>
+            
+            <div className="my-2 border-t border-[var(--color-base-border)]/20"></div>
+            
+            <FilterItem active={filter === 'text'} onClick={() => setFilter('text')}>文字</FilterItem>
+            <FilterItem active={filter === 'image'} onClick={() => setFilter('image')}>图片</FilterItem>
+            <FilterItem active={filter === 'audio'} onClick={() => setFilter('audio')}>音频</FilterItem>
+            
+            <div className="my-2 border-t border-[var(--color-base-border)]/20"></div>
+            
+            <FilterItem active={filter === 'draft'} onClick={() => setFilter('draft')}>草稿</FilterItem>
+            <FilterItem active={filter === 'archived'} onClick={() => setFilter('archived')}>已归档</FilterItem>
+            <FilterItem active={filter === 'favorited'} onClick={() => setFilter('favorited')}>收藏</FilterItem>
+            
+            <div className="my-2 border-t border-[var(--color-base-border)]/20"></div>
+            
+            <FilterItem active={filter === 'trash'} onClick={() => setFilter('trash')}>
+              <span className="flex items-center gap-2">
+                <Trash2 size={10} />
+                回收站
+              </span>
+            </FilterItem>
+          </nav>
 
           {/* Footer */}
-          <div className="mt-auto p-4 border-t border-[var(--color-base-border)]/30">
+          <div className="p-4 border-t border-[var(--color-base-border)]/30">
             <div className="text-[9px] font-mono text-[var(--color-base-text)] opacity-25 tracking-widest text-center leading-relaxed">
               <div>私人档案室</div>
               <div className="text-[8px] opacity-50 mt-1">ARCHIVE VAULT</div>
@@ -319,7 +335,7 @@ const ArchivePage: React.FC = () => {
         </div>
 
         {/* ── Middle: Archive List (flex-1) ── */}
-        <div className="flex-1 flex flex-col overflow-hidden rounded-lg"
+        <div className="flex-1 min-h-0 flex flex-col overflow-hidden rounded-lg"
              style={{ backgroundColor: 'var(--color-base-bg)', border: '1px solid var(--color-base-border)/20' }}>
           
           {/* Search header */}
@@ -347,11 +363,24 @@ const ArchivePage: React.FC = () => {
                   {Object.keys(grouped).length} 个日期分组
                 </span>
               )}
+              {filter === 'trash' && filtered.length > 0 && (
+                <button
+                  onClick={() => setShowEmptyTrashDialog(true)}
+                  className="px-2 py-1 text-[9px] font-mono flex items-center gap-1 rounded-sm transition-colors"
+                  style={{ 
+                    backgroundColor: 'rgba(154, 133, 69, 0.15)', 
+                    color: '#9a8545',
+                    border: '1px solid rgba(154, 133, 69, 0.3)'
+                  }}
+                >
+                  <Trash2 size={9} /> 清空回收站
+                </button>
+              )}
             </div>
           </div>
 
           {/* List area */}
-          <div className="flex-1 overflow-y-auto p-3 custom-scrollbar">
+          <div className="flex-1 min-h-0 overflow-y-auto p-3 custom-scrollbar">
             {loading ? (
               <div className="h-full flex items-center justify-center">
                 <motion.div
@@ -381,10 +410,16 @@ const ArchivePage: React.FC = () => {
                 </div>
               </div>
             ) : (
-              /* Grouped file list */
+              /* Grouped file list with stagger animation */
               <div className="space-y-5">
                 {Object.entries(grouped).sort(([a], [b]) => b.localeCompare(a)).map(([date, caps]) => (
-                  <div key={date}>
+                  <motion.div
+                    key={date}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.2 }}
+                  >
                     {/* Date label */}
                     <div className="flex items-center gap-3 mb-3">
                       <div className="flex items-center gap-2 px-3 py-1.5 rounded-md"
@@ -399,18 +434,36 @@ const ArchivePage: React.FC = () => {
                       <span className="text-[9px] font-mono text-[var(--color-base-text)] opacity-40">{caps.length}份</span>
                     </div>
 
-                    {/* File cards */}
-                    <div className="space-y-1.5 ml-1">
-                      {caps.map((cap) => (
-                        <ArchiveFileCard
-                          key={cap.id}
-                          capsule={cap}
-                          isSelected={selectedCapsule?.id === cap.id}
-                          onClick={() => handleSelectCapsule(cap)}
-                        />
-                      ))}
-                    </div>
-                  </div>
+                    {/* File cards with stagger animation */}
+                    <AnimatePresence mode="popLayout">
+                      <div className="space-y-1.5 ml-1">
+                        {caps.map((cap, index) => (
+                          <motion.div
+                            key={cap.id}
+                            initial={{ opacity: 0, x: -20, scale: 0.95 }}
+                            animate={{ opacity: 1, x: 0, scale: 1 }}
+                            exit={{ opacity: 0, x: 20, scale: 0.95 }}
+                            transition={{ 
+                              type: 'spring',
+                              stiffness: 300,
+                              damping: 25,
+                              delay: index * 0.04,
+                              layout: { type: 'spring', stiffness: 300, damping: 30 }
+                            }}
+                            whileHover={{ x: 4 }}
+                            whileTap={{ scale: 0.98 }}
+                            layout
+                          >
+                            <ArchiveFileCard
+                              capsule={cap}
+                              isSelected={selectedCapsule?.id === cap.id}
+                              onClick={() => handleSelectCapsule(cap)}
+                            />
+                          </motion.div>
+                        ))}
+                      </div>
+                    </AnimatePresence>
+                  </motion.div>
                 ))}
               </div>
             )}
@@ -418,16 +471,16 @@ const ArchivePage: React.FC = () => {
         </div>
 
         {/* ── Right: Archive Detail (320px) ── */}
-        <div className="w-[320px] flex-shrink-0 flex flex-col rounded-lg overflow-hidden"
+        <div className="w-[320px] flex-shrink-0 flex flex-col min-h-0 rounded-lg overflow-hidden"
              style={{ backgroundColor: 'var(--color-base-panel)', border: '1px solid var(--color-base-border)/50' }}>
           <AnimatePresence mode="wait">
             {selectedCapsule ? (
               <motion.div
                 key={selectedCapsule.id}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                transition={{ duration: 0.2 }}
+                initial={{ opacity: 0, y: 20, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -10, scale: 0.98 }}
+                transition={{ type: 'spring', stiffness: 300, damping: 28 }}
                 className="flex flex-col h-full"
               >
                 {/* Archive header */}
@@ -542,100 +595,110 @@ const ArchivePage: React.FC = () => {
 
                 {/* Action area */}
                 <div className="p-3 border-t border-[var(--color-base-border)]/50 space-y-2" style={{ backgroundColor: 'var(--color-base-bg)/20' }}>
-                  {/* Status actions */}
-                  {!selectedCapsule.deletedAt && (
-                    <div className="flex flex-wrap gap-1.5 mb-2">
-                      <button
-                        onClick={() => handleStatusChange('pending')}
-                        disabled={selectedCapsule.status === 'pending'}
-                        className="px-2 py-1 text-[9px] font-mono flex items-center gap-1 rounded-sm transition-colors"
-                        style={{ 
-                          backgroundColor: 'rgba(59, 130, 246, 0.1)', 
-                          color: '#60a5fa',
-                          opacity: selectedCapsule.status === 'pending' ? 0.3 : 1
-                        }}
-                      >
-                        <FileText size={9} /> 待整理
-                      </button>
-                      <button
-                        onClick={() => handleStatusChange('favorited')}
-                        disabled={selectedCapsule.status === 'favorited'}
-                        className="px-2 py-1 text-[9px] font-mono flex items-center gap-1 rounded-sm transition-colors"
-                        style={{ 
-                          backgroundColor: 'rgba(52, 211, 153, 0.1)', 
-                          color: '#34d399',
-                          opacity: selectedCapsule.status === 'favorited' ? 0.3 : 1
-                        }}
-                      >
-                        <Heart size={9} /> 收藏
-                      </button>
-                      <button
-                        onClick={() => handleStatusChange('archived')}
-                        disabled={selectedCapsule.status === 'archived'}
-                        className="px-2 py-1 text-[9px] font-mono flex items-center gap-1 rounded-sm transition-colors"
-                        style={{ 
-                          backgroundColor: 'rgba(148, 163, 184, 0.1)', 
-                          color: '#94a3b8',
-                          opacity: selectedCapsule.status === 'archived' ? 0.3 : 1
-                        }}
-                      >
-                        <ArchiveIcon size={9} /> 归档
-                      </button>
-                    </div>
-                  )}
-
-                  {/* Main actions */}
+                  {/* Trash view: Restore and Delete Forever buttons */}
                   {selectedCapsule.deletedAt ? (
-                    <button
-                      onClick={handleRestore}
-                      className="w-full py-2.5 flex items-center justify-center gap-2 font-mono text-xs tracking-widest transition-colors rounded-md"
-                      style={{ backgroundColor: 'rgba(74, 122, 155, 0.15)', color: 'var(--color-base-accent)', border: '1px solid rgba(74, 122, 155, 0.2)' }}
-                    >
-                      <RotateCcw size={13} /> 恢复档案
-                    </button>
+                    <>
+                      <button
+                        onClick={handleRestore}
+                        className="w-full py-2.5 flex items-center justify-center gap-2 font-mono text-xs tracking-widest transition-colors rounded-md"
+                        style={{ backgroundColor: 'rgba(74, 122, 155, 0.15)', color: 'var(--color-base-accent)', border: '1px solid rgba(74, 122, 155, 0.2)' }}
+                      >
+                        <RotateCcw size={13} /> 恢复档案
+                      </button>
+                      <button
+                        onClick={handlePermanentDelete}
+                        className="w-full py-2 flex items-center justify-center gap-2 font-mono text-xs tracking-widest transition-colors rounded-md"
+                        style={{ color: 'var(--color-base-text)', opacity: 0.6 }}
+                        onMouseEnter={(e) => (e.currentTarget.style.opacity = '1')}
+                        onMouseLeave={(e) => (e.currentTarget.style.opacity = '0.6')}
+                      >
+                        <Trash2 size={12} /> 永久删除
+                      </button>
+                    </>
                   ) : (
-                    <div className="flex gap-2">
-                      {isEditing ? (
-                        <>
-                          <button
-                            onClick={() => { setIsEditing(false); setEditContent(selectedCapsule.content || ''); }}
-                            className="flex-1 py-2 flex items-center justify-center gap-1 font-mono text-xs transition-colors rounded-md"
-                            style={{ backgroundColor: 'var(--color-base-border)', color: 'var(--color-base-text-bright)' }}
-                          >
-                            <X size={11} /> 取消
-                          </button>
-                          <button
-                            onClick={handleSave}
-                            disabled={isSaving}
-                            className="flex-1 py-2 flex items-center justify-center gap-1 font-mono text-xs transition-colors rounded-md disabled:opacity-50"
-                            style={{ backgroundColor: 'rgba(61, 139, 122, 0.8)', color: 'var(--color-base-bg)' }}
-                          >
-                            <Check size={11} /> {isSaving ? '保存中' : '保存'}
-                          </button>
-                        </>
-                      ) : (
+                    <>
+                      {/* Status actions */}
+                      <div className="flex flex-wrap gap-1.5 mb-2">
                         <button
-                          onClick={() => setIsEditing(true)}
-                          className="flex-1 py-2 flex items-center justify-center gap-2 font-mono text-xs tracking-widest transition-colors rounded-md"
-                          style={{ backgroundColor: 'var(--color-base-border)/80', color: 'var(--color-base-text-bright)' }}
+                          onClick={() => handleStatusChange('pending')}
+                          disabled={selectedCapsule.status === 'pending'}
+                          className="px-2 py-1 text-[9px] font-mono flex items-center gap-1 rounded-sm transition-colors"
+                          style={{ 
+                            backgroundColor: 'rgba(59, 130, 246, 0.1)', 
+                            color: '#60a5fa',
+                            opacity: selectedCapsule.status === 'pending' ? 0.3 : 1
+                          }}
                         >
-                          <Edit3 size={12} /> 编辑
+                          <FileText size={9} /> 待整理
                         </button>
-                      )}
-                    </div>
-                  )}
+                        <button
+                          onClick={() => handleStatusChange('favorited')}
+                          disabled={selectedCapsule.status === 'favorited'}
+                          className="px-2 py-1 text-[9px] font-mono flex items-center gap-1 rounded-sm transition-colors"
+                          style={{ 
+                            backgroundColor: 'rgba(52, 211, 153, 0.1)', 
+                            color: '#34d399',
+                            opacity: selectedCapsule.status === 'favorited' ? 0.3 : 1
+                          }}
+                        >
+                          <Heart size={9} /> 收藏
+                        </button>
+                        <button
+                          onClick={() => handleStatusChange('archived')}
+                          disabled={selectedCapsule.status === 'archived'}
+                          className="px-2 py-1 text-[9px] font-mono flex items-center gap-1 rounded-sm transition-colors"
+                          style={{ 
+                            backgroundColor: 'rgba(148, 163, 184, 0.1)', 
+                            color: '#94a3b8',
+                            opacity: selectedCapsule.status === 'archived' ? 0.3 : 1
+                          }}
+                        >
+                          <ArchiveIcon size={9} /> 归档
+                        </button>
+                      </div>
 
-                  {/* Delete */}
-                  {!selectedCapsule.deletedAt && (
-                    <button
-                      onClick={handleDelete}
-                      className="w-full py-2 flex items-center justify-center gap-2 font-mono text-xs tracking-widest transition-colors rounded-md"
-                      style={{ color: 'var(--color-base-text)', opacity: 0.5 }}
-                      onMouseEnter={(e) => (e.currentTarget.style.opacity = '1')}
-                      onMouseLeave={(e) => (e.currentTarget.style.opacity = '0.5')}
-                    >
-                      <Trash2 size={12} /> 移出档案柜
-                    </button>
+                      {/* Main actions */}
+                      <div className="flex gap-2">
+                        {isEditing ? (
+                          <>
+                            <button
+                              onClick={() => { setIsEditing(false); setEditContent(selectedCapsule.content || ''); }}
+                              className="flex-1 py-2 flex items-center justify-center gap-1 font-mono text-xs transition-colors rounded-md"
+                              style={{ backgroundColor: 'var(--color-base-border)', color: 'var(--color-base-text-bright)' }}
+                            >
+                              <X size={11} /> 取消
+                            </button>
+                            <button
+                              onClick={handleSave}
+                              disabled={isSaving}
+                              className="flex-1 py-2 flex items-center justify-center gap-1 font-mono text-xs transition-colors rounded-md disabled:opacity-50"
+                              style={{ backgroundColor: 'rgba(61, 139, 122, 0.8)', color: 'var(--color-base-bg)' }}
+                            >
+                              <Check size={11} /> {isSaving ? '保存中' : '保存'}
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            onClick={() => setIsEditing(true)}
+                            className="flex-1 py-2 flex items-center justify-center gap-2 font-mono text-xs tracking-widest transition-colors rounded-md"
+                            style={{ backgroundColor: 'var(--color-base-border)/80', color: 'var(--color-base-text-bright)' }}
+                          >
+                            <Edit3 size={12} /> 编辑
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Delete */}
+                      <button
+                        onClick={handleDelete}
+                        className="w-full py-2 flex items-center justify-center gap-2 font-mono text-xs tracking-widest transition-colors rounded-md"
+                        style={{ color: 'var(--color-base-text)', opacity: 0.5 }}
+                        onMouseEnter={(e) => (e.currentTarget.style.opacity = '1')}
+                        onMouseLeave={(e) => (e.currentTarget.style.opacity = '0.5')}
+                      >
+                        <Trash2 size={12} /> 移出档案柜
+                      </button>
+                    </>
                   )}
                 </div>
               </motion.div>
@@ -667,6 +730,62 @@ const ArchivePage: React.FC = () => {
           </AnimatePresence>
         </div>
       </div>
+
+      {/* Empty Trash Confirmation Dialog */}
+      <AnimatePresence>
+        {showEmptyTrashDialog && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center"
+            style={{ backgroundColor: 'rgba(0, 0, 0, 0.7)' }}
+            onClick={() => setShowEmptyTrashDialog(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+              className="w-[320px] rounded-xl p-5"
+              style={{ backgroundColor: 'var(--color-base-panel)', border: '1px solid var(--color-base-border)/50' }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ backgroundColor: 'rgba(154, 133, 69, 0.15)' }}>
+                  <Trash2 size={18} className="text-[#9a8545]" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-mono text-[var(--color-base-text-bright)] tracking-wider">清空回收站</h3>
+                  <p className="text-[10px] font-mono text-[var(--color-base-text)] opacity-50">此操作不可撤销</p>
+                </div>
+              </div>
+              
+              <p className="text-xs font-mono text-[var(--color-base-text)] opacity-70 leading-relaxed mb-5">
+                确定要永久删除回收站中的所有档案吗？<br/>
+                <span style={{ color: '#9a8545' }}>此操作无法恢复。</span>
+              </p>
+              
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowEmptyTrashDialog(false)}
+                  className="flex-1 py-2 flex items-center justify-center gap-1 font-mono text-xs transition-colors rounded-md"
+                  style={{ backgroundColor: 'var(--color-base-border)', color: 'var(--color-base-text-bright)' }}
+                >
+                  <X size={11} /> 取消
+                </button>
+                <button
+                  onClick={handleEmptyTrash}
+                  className="flex-1 py-2 flex items-center justify-center gap-1 font-mono text-xs transition-colors rounded-md"
+                  style={{ backgroundColor: 'rgba(154, 133, 69, 0.2)', color: '#9a8545', border: '1px solid rgba(154, 133, 69, 0.3)' }}
+                >
+                  <Trash2 size={11} /> 确认清空
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

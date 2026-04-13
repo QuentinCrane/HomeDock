@@ -6,16 +6,37 @@ import { Request, Response } from 'express';
 interface SSEClient {
   id: string;
   res: Response;
+  lastSeen: number;
 }
 
 class EventBroadcaster {
   private clients: SSEClient[] = [];
   private clientIdCounter = 0;
+  private readonly MAX_CLIENTS = 100;
+  private readonly CLIENT_TIMEOUT = 300000; // 5 minutes
+  private readonly CLEANUP_INTERVAL = 60000; // 1 minute
+
+  constructor() {
+    setInterval(() => this.cleanupStaleClients(), this.CLEANUP_INTERVAL);
+  }
+
+  private cleanupStaleClients(): void {
+    const now = Date.now();
+    const before = this.clients.length;
+    this.clients = this.clients.filter(c => now - c.lastSeen < this.CLIENT_TIMEOUT);
+    if (this.clients.length < before) {
+      console.log(`[SSE] Cleaned up ${before - this.clients.length} stale clients`);
+    }
+  }
 
   // Add a new SSE client connection
   addClient(res: Response): string {
+    if (this.clients.length >= this.MAX_CLIENTS) {
+      this.clients = this.clients.slice(0, this.MAX_CLIENTS / 2);
+      console.log(`[SSE] Client limit reached, removed oldest half`);
+    }
     const id = `client_${++this.clientIdCounter}`;
-    this.clients.push({ id, res });
+    this.clients.push({ id, res, lastSeen: Date.now() });
 
     // Send initial connection confirmation
     this.sendToClient(res, {
@@ -42,12 +63,14 @@ class EventBroadcaster {
   // Broadcast to all connected clients
   broadcast(event: { type: string; data: any }): void {
     const message = `event: ${event.type}\ndata: ${JSON.stringify(event.data)}\n\n`;
-    this.clients.forEach(client => {
+    this.clients = this.clients.filter(client => {
       try {
         client.res.write(message);
+        client.lastSeen = Date.now();
+        return true;
       } catch (err) {
         console.error(`[SSE] Error writing to client ${client.id}:`, err);
-        this.removeClient(client.id);
+        return false;
       }
     });
   }
@@ -93,17 +116,29 @@ export function handleSSEConnection(req: Request, res: Response): void {
   res.setHeader('Connection', 'keep-alive');
   res.setHeader('Access-Control-Allow-Origin', '*');
 
-  // Send a keepalive comment every 30 seconds
-  const keepalive = setInterval(() => {
-    res.write(': keepalive\n\n');
-  }, 30000);
-
   // Add client
   const clientId = eventBroadcaster.addClient(res);
 
+  // Send heartbeat event every 30 seconds to keep connection alive
+  const heartbeat = setInterval(() => {
+    try {
+      res.write(`event: heartbeat\ndata: ${Date.now()}\n\n`);
+    } catch (e) {
+      console.error('[SSE] Heartbeat write failed:', e);
+      clearInterval(heartbeat);
+      eventBroadcaster.removeClient(clientId);
+    }
+  }, 30000);
+
   // Handle client disconnect
   req.on('close', () => {
-    clearInterval(keepalive);
+    clearInterval(heartbeat);
+    eventBroadcaster.removeClient(clientId);
+  });
+
+  req.on('error', (err) => {
+    console.error('[SSE] Request error:', err);
+    clearInterval(heartbeat);
     eventBroadcaster.removeClient(clientId);
   });
 }

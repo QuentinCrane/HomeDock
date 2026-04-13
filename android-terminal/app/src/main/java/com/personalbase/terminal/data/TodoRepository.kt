@@ -7,11 +7,12 @@ class TodoRepository(private val dao: TodoDao) {
     val activeTodos: Flow<List<TodoEntity>> = dao.getActiveTodos()
     val completedTodos: Flow<List<TodoEntity>> = dao.getCompletedTodos()
 
-    suspend fun addTodo(title: String, description: String? = null, dueDate: Long? = null): Long {
+    suspend fun addTodo(title: String, description: String? = null, dueDate: Long? = null, importance: Int = 0): Long {
         val entity = TodoEntity(
             title = title,
             description = description,
-            dueDate = dueDate
+            dueDate = dueDate,
+            importance = importance
         )
         return dao.insert(entity)
     }

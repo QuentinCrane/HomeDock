@@ -39,19 +39,27 @@ const SyncToast: React.FC<SyncToastProps> = ({
 }) => {
   const [isExiting, setIsExiting] = useState(false);
 
+  // Timer for triggering exit state after duration
   useEffect(() => {
-    if (visible && duration > 0 && !isExiting) {
-      const timer = setTimeout(() => {
-        setIsExiting(true);
-        // Allow exit animation to complete before removing
-        setTimeout(() => {
-          onClose?.();
-        }, 300);
-      }, duration);
+    if (!visible || duration <= 0 || isExiting) return;
 
-      return () => clearTimeout(timer);
-    }
-  }, [visible, duration, onClose, isExiting]);
+    const timer = setTimeout(() => {
+      setIsExiting(true);
+    }, duration);
+
+    return () => clearTimeout(timer);
+  }, [visible, duration, isExiting]);
+
+  // Handle close callback after exit animation completes
+  useEffect(() => {
+    if (!isExiting) return;
+
+    const closeTimer = setTimeout(() => {
+      onClose?.();
+    }, 300);
+
+    return () => clearTimeout(closeTimer);
+  }, [isExiting, onClose]);
 
   const handleClose = () => {
     setIsExiting(true);

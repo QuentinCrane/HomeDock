@@ -54,6 +54,8 @@ const CapsuleDrawer: React.FC<CapsuleDrawerProps> = ({ capsule, isOpen, onClose,
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [toast, setToast] = useState<{ message: string; visible: boolean }>({ message: '', visible: false });
+  const [imageFullscreen, setImageFullscreen] = useState(false);
+  const [textFullscreen, setTextFullscreen] = useState(false);
 
   const showToast = (message: string) => {
     setToast({ message, visible: true });
@@ -121,56 +123,46 @@ const CapsuleDrawer: React.FC<CapsuleDrawerProps> = ({ capsule, isOpen, onClose,
   return (
     <AnimatePresence>
       {isOpen && (
-        <>
-          {/* Backdrop - 使用 CSS 变量适配日/夜间模式 */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={onClose}
-            className="fixed inset-0 z-40"
-            style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}
-          />
-
-          {/* Drawer */}
-          <motion.div
-            initial={{ x: '100%', opacity: 0 }}
-            animate={{ x: 0, opacity: 1 }}
-            exit={{ x: '100%', opacity: 0 }}
-            transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-            className="fixed right-0 top-0 bottom-0 w-full max-w-md bg-[var(--color-base-panel)] border-l border-[var(--color-base-border)] z-50 flex flex-col"
-          >
-            {/* Toast */}
-            <AnimatePresence>
-              {toast.visible && (
-                <motion.div
-                  initial={{ y: -20, opacity: 0 }}
-                  animate={{ y: 0, opacity: 1 }}
-                  exit={{ y: -20, opacity: 0 }}
-                  transition={{ duration: 0.2 }}
-                  className="absolute top-16 left-1/2 -translate-x-1/2 px-4 py-2 bg-[var(--color-base-success)] text-[var(--color-base-bg)] text-xs font-mono tracking-widest shadow-lg z-50"
-                >
-                  {toast.message}
-                </motion.div>
-              )}
-            </AnimatePresence>
-            {/* Header */}
-            <div className="flex items-center justify-between p-4 border-b border-[var(--color-base-border)]">
-              <div className="flex items-center gap-3">
-                <span className={`px-2 py-0.5 text-[10px] font-mono uppercase ${getStatusStyle(capsule.status).color} ${getStatusStyle(capsule.status).bgColor}`}>
-                  {getStatusStyle(capsule.status).label}
-                </span>
-                <span className="text-[10px] font-mono text-[var(--color-base-text)] opacity-50">
-                  #{capsule.id.toString().padStart(4, '0')}
-                </span>
-              </div>
-              <button
-                onClick={onClose}
-                className="p-1.5 text-[var(--color-base-text)] hover:text-[var(--color-base-text-bright)] transition-colors"
+        <motion.div
+          initial={{ x: '100%' }}
+          animate={{ x: 0 }}
+          exit={{ x: '100%' }}
+          transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+          className="fixed right-0 top-0 bottom-0 w-80 bg-[var(--color-base-panel)] border-l border-[var(--color-base-border)] z-50 flex flex-col shadow-2xl"
+        >
+          {/* Toast */}
+          <AnimatePresence>
+            {toast.visible && (
+              <motion.div
+                initial={{ y: -20, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                exit={{ y: -20, opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className="absolute top-16 left-1/2 -translate-x-1/2 px-4 py-2 bg-[var(--color-base-success)] text-[var(--color-base-bg)] text-xs font-mono tracking-widest shadow-lg z-50"
               >
-                <X size={18} />
-              </button>
+                {toast.message}
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Header with close button inside */}
+          <div className="flex items-center justify-between p-4 border-b border-[var(--color-base-border)] relative">
+            {/* Close button - now inside header */}
+            <button
+              onClick={onClose}
+              className="w-8 h-8 flex items-center justify-center text-[var(--color-base-text)] hover:text-[var(--color-base-text-bright)] hover:bg-[var(--color-base-border)] transition-colors rounded-lg"
+            >
+              <X size={18} />
+            </button>
+            <div className="flex items-center gap-3 absolute left-1/2 -translate-x-1/2">
+              <span className={`px-2 py-0.5 text-[10px] font-mono uppercase ${getStatusStyle(capsule.status).color} ${getStatusStyle(capsule.status).bgColor}`}>
+                {getStatusStyle(capsule.status).label}
+              </span>
+              <span className="text-[10px] font-mono text-[var(--color-base-text)] opacity-50">
+                #{capsule.id.toString().padStart(4, '0')}
+              </span>
             </div>
+          </div>
 
             {/* Content */}
             <div className="flex-1 overflow-y-auto p-5 custom-scrollbar">
@@ -194,19 +186,41 @@ const CapsuleDrawer: React.FC<CapsuleDrawerProps> = ({ capsule, isOpen, onClose,
                     autoFocus
                   />
                 ) : (
-                  <p className="text-base text-[var(--color-base-text-light)] font-serif leading-relaxed whitespace-pre-wrap">
-                    {capsule.content || '(空)'}
-                  </p>
+                  <div 
+                    className="relative cursor-pointer group"
+                    onClick={() => setTextFullscreen(true)}
+                  >
+                    <p className="text-base text-[var(--color-base-text-light)] font-serif leading-relaxed whitespace-pre-wrap">
+                      {capsule.content || '(空)'}
+                    </p>
+                    {/* Hover hint */}
+                    <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center pointer-events-none">
+                      <div className="bg-black/40 text-white text-xs font-mono px-3 py-1.5 rounded-full">
+                        点击放大
+                      </div>
+                    </div>
+                  </div>
                 )
               )}
 
               {capsule.type === 'image' && capsule.fileUrl && (
                 <div className="space-y-4">
-                  <img
-                    src={`http://localhost:3000${capsule.fileUrl}`}
-                    alt="碎片图片"
-                    className="w-full object-contain border border-[var(--color-base-border)]"
-                  />
+                  <div 
+                    className="relative cursor-pointer group overflow-hidden rounded-lg"
+                    onClick={() => setImageFullscreen(true)}
+                  >
+                    <img
+                      src={`http://localhost:3000${capsule.fileUrl}`}
+                      alt="碎片图片"
+                      className="w-full object-contain border border-[var(--color-base-border)] transition-all group-hover:brightness-105"
+                    />
+                    {/* Hover overlay hint */}
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-all flex items-center justify-center">
+                      <div className="opacity-0 group-hover:opacity-100 transition-all bg-black/40 text-white text-xs font-mono px-3 py-1.5 rounded-full">
+                        点击放大
+                      </div>
+                    </div>
+                  </div>
                   {capsule.content && (
                     <p className="text-sm text-[var(--color-base-text-light)] font-serif">{capsule.content}</p>
                   )}
@@ -363,8 +377,113 @@ const CapsuleDrawer: React.FC<CapsuleDrawerProps> = ({ capsule, isOpen, onClose,
                 </button>
               )}
             </div>
-          </motion.div>
-        </>
+
+            {/* Image Fullscreen Modal with Frosted Glass */}
+            <AnimatePresence>
+              {imageFullscreen && capsule.fileUrl && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="fixed inset-0 z-[100] flex items-center justify-center"
+                  style={{ backgroundColor: 'rgba(0, 0, 0, 0.9)' }}
+                  onClick={() => setImageFullscreen(false)}
+                >
+                  {/* Close button */}
+                  <button
+                    onClick={() => setImageFullscreen(false)}
+                    className="absolute top-4 right-4 z-[110] w-10 h-10 rounded-full bg-white/10 backdrop-blur-md text-white flex items-center justify-center hover:bg-white/20 transition-colors"
+                  >
+                    <X size={18} />
+                  </button>
+
+                  {/* Image container with frosted glass effect around edges */}
+                  <motion.div
+                    initial={{ scale: 0.9, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    exit={{ scale: 0.9, opacity: 0 }}
+                    transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+                    className="relative max-w-[90vw] max-h-[85vh]"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {/* Frosted glass frame */}
+                    <div className="absolute -inset-4 rounded-2xl bg-white/5 backdrop-blur-xl border border-white/10 shadow-2xl pointer-events-none" />
+                    
+                    {/* Image */}
+                    <img
+                      src={`http://localhost:3000${capsule.fileUrl}`}
+                      alt="碎片图片"
+                      className="relative max-w-[90vw] max-h-[85vh] object-contain rounded-xl shadow-2xl"
+                      style={{ 
+                        backdropFilter: 'blur(20px)',
+                      }}
+                    />
+
+                    {/* Caption if exists */}
+                    {capsule.content && (
+                      <div className="absolute -bottom-12 left-0 right-0 text-center">
+                        <p className="text-sm font-mono text-white/80 backdrop-blur-sm bg-black/30 inline-block px-4 py-2 rounded-lg">
+                          {capsule.content}
+                        </p>
+                      </div>
+                    )}
+                  </motion.div>
+
+                  {/* Hint text */}
+                  <p className="absolute bottom-6 left-1/2 -translate-x-1/2 text-xs font-mono text-white/40">
+                    点击任意处关闭
+                  </p>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Text Fullscreen Modal */}
+            <AnimatePresence>
+              {textFullscreen && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="fixed inset-0 z-[100] flex items-center justify-center"
+                  style={{ backgroundColor: 'rgba(0, 0, 0, 0.92)' }}
+                  onClick={() => setTextFullscreen(false)}
+                >
+                  {/* Close button */}
+                  <button
+                    onClick={() => setTextFullscreen(false)}
+                    className="absolute top-4 right-4 z-[110] w-10 h-10 rounded-full bg-white/10 backdrop-blur-md text-white flex items-center justify-center hover:bg-white/20 transition-colors"
+                  >
+                    <X size={18} />
+                  </button>
+
+                  {/* Text container with frosted glass effect */}
+                  <motion.div
+                    initial={{ scale: 0.9, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    exit={{ scale: 0.9, opacity: 0 }}
+                    transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+                    className="relative max-w-[80vw] max-h-[85vh] overflow-hidden"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {/* Frosted glass background */}
+                    <div className="absolute inset-0 rounded-2xl bg-[var(--color-base-panel)]/95 backdrop-blur-xl border border-white/10 shadow-2xl" />
+                    
+                    {/* Text content */}
+                    <div className="relative p-8 overflow-y-auto max-h-[80vh]">
+                      <p className="text-xl text-[var(--color-base-text-light)] font-serif leading-relaxed whitespace-pre-wrap">
+                        {capsule.content || '(空)'}
+                      </p>
+                    </div>
+                  </motion.div>
+
+                  {/* Hint text */}
+                  <p className="absolute bottom-6 left-1/2 -translate-x-1/2 text-xs font-mono text-white/40">
+                    点击任意处关闭
+                  </p>
+                </motion.div>
+              )}
+            </AnimatePresence>
+        </motion.div>
       )}
     </AnimatePresence>
   );

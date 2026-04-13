@@ -12,6 +12,9 @@ android-terminal/.gradle/
 android-terminal/build/
 android-terminal/app/build/
 
+# Exception: Include debug APK for GitHub release
+!android-terminal/app/build/outputs/apk/debug/*.apk
+
 # IDE
 .idea/
 *.iml

@@ -209,6 +209,40 @@ router.post('/capsules/:id/restore', (req, res) => {
   );
 });
 
+// Empty trash - permanently delete all soft-deleted capsules
+router.delete('/capsules/trash', (req, res) => {
+  db.run(
+    `DELETE FROM capsules WHERE deletedAt IS NOT NULL`,
+    function (err) {
+      if (err) {
+        console.error('Error emptying trash', err);
+        return res.status(500).json({ success: false, message: 'Database error' });
+      }
+      res.json({ success: true, data: { deleted: this.changes } });
+    }
+  );
+});
+
+// Permanent delete - truly deletes from DB (no soft delete)
+router.delete('/capsules/:id/permanent', (req, res) => {
+  const { id } = req.params;
+
+  db.run(
+    `DELETE FROM capsules WHERE id = ?`,
+    [id],
+    function (err) {
+      if (err) {
+        console.error('Error permanently deleting capsule', err);
+        return res.status(500).json({ success: false, message: 'Database error' });
+      }
+      if (this.changes === 0) {
+        return res.status(404).json({ success: false, message: 'Capsule not found' });
+      }
+      res.json({ success: true, data: { id } });
+    }
+  );
+});
+
 // Recapture a capsule (clone as new)
 router.post('/capsules/:id/recapture', (req, res) => {
   const { id } = req.params;
@@ -237,6 +271,90 @@ router.post('/capsules/:id/recapture', (req, res) => {
             id: this.lastID,
             message: '重新投放成功'
           }
+        });
+      }
+    );
+  });
+});
+
+// Organize a capsule - handle archive/wall/echo/delete actions
+router.put('/capsules/:id/organize', (req, res) => {
+  const { id } = req.params;
+  const { action } = req.body;
+
+  if (!action || !['archive', 'wall', 'echo', 'delete'].includes(action)) {
+    return res.status(400).json({ success: false, message: 'Invalid action. Must be: archive, wall, echo, or delete' });
+  }
+
+  // First fetch the capsule to get current content
+  db.get(`SELECT * FROM capsules WHERE id = ? AND deletedAt IS NULL`, [id], (err, row: any) => {
+    if (err) {
+      console.error('Error fetching capsule for organize', err);
+      return res.status(500).json({ success: false, message: 'Database error' });
+    }
+    if (!row) {
+      return res.status(404).json({ success: false, message: 'Capsule not found' });
+    }
+
+    const updatedAt = Date.now();
+    let updates: string[] = ['updatedAt = ?'];
+    let params: any[] = [updatedAt];
+
+    switch (action) {
+      case 'archive':
+        // archive → status = 'archived', keep content
+        updates.push(`status = ?`);
+        params.push('archived');
+        break;
+      case 'wall':
+        // wall → status = 'archived', content = '[Wall] ' + original content
+        updates.push(`status = ?`);
+        params.push('archived');
+        updates.push(`content = ?`);
+        params.push('[Wall] ' + (row.content || ''));
+        break;
+      case 'echo':
+        // echo → status = 'echoing'
+        updates.push(`status = ?`);
+        params.push('echoing');
+        break;
+      case 'delete':
+        // delete → soft delete (set deletedAt)
+        updates.push(`deletedAt = ?`);
+        params.push(updatedAt);
+        updates.push(`status = ?`);
+        params.push('archived');
+        break;
+    }
+
+    params.push(id);
+
+    db.run(
+      `UPDATE capsules SET ${updates.join(', ')} WHERE id = ?`,
+      params,
+      function (err) {
+        if (err) {
+          console.error('Error organizing capsule', err);
+          return res.status(500).json({ success: false, message: 'Database error' });
+        }
+        if (this.changes === 0) {
+          return res.status(404).json({ success: false, message: 'Capsule not found or already deleted' });
+        }
+
+        // Broadcast SSE event
+        if (action === 'delete') {
+          eventBroadcaster.capsuleDeleted(parseInt(id));
+        } else {
+          eventBroadcaster.capsuleUpdated({ id: parseInt(id), updatedAt, action });
+        }
+
+        // Fetch updated capsule
+        db.get(`SELECT * FROM capsules WHERE id = ?`, [id], (err, updatedRow: any) => {
+          if (err) {
+            console.error('Error fetching updated capsule', err);
+            return res.json({ success: true, data: { id, action, updatedAt } });
+          }
+          res.json({ success: true, data: updatedRow });
         });
       }
     );
@@ -296,7 +414,7 @@ router.get('/todos', (req, res) => {
 
 // Create a new todo
 router.post('/todos', (req, res) => {
-  const { title, description, dueDate, localId } = req.body;
+  const { title, description, dueDate, localId, importance } = req.body;
 
   if (!title) {
     return res.status(400).json({ success: false, message: 'Title is required' });
@@ -304,10 +422,11 @@ router.post('/todos', (req, res) => {
 
   const createdAt = Date.now();
   const todoLocalId = localId || `server_${createdAt}`;
+  const todoImportance = Math.min(5, Math.max(0, parseInt(importance) || 0));
 
   db.run(
-    `INSERT INTO todos (title, description, dueDate, completed, createdAt, localId) VALUES (?, ?, ?, ?, ?, ?)`,
-    [title, description || null, dueDate || null, 0, createdAt, todoLocalId],
+    `INSERT INTO todos (title, description, dueDate, completed, createdAt, localId, importance) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [title, description || null, dueDate || null, 0, createdAt, todoLocalId, todoImportance],
     function (err) {
       if (err) {
         console.error('Error inserting todo', err);
@@ -321,7 +440,8 @@ router.post('/todos', (req, res) => {
         dueDate: dueDate || null,
         completed: false,
         createdAt,
-        updatedAt: createdAt
+        updatedAt: createdAt,
+        importance: todoImportance
       };
       // Broadcast SSE event
       eventBroadcaster.todoCreated(todoData);
@@ -341,7 +461,7 @@ router.post('/todos', (req, res) => {
 // Update a todo
 router.put('/todos/:id', (req, res) => {
   const { id } = req.params;
-  const { title, description, dueDate, completed, calendarEventId } = req.body;
+  const { title, description, dueDate, completed, calendarEventId, importance } = req.body;
   const updatedAt = Date.now();
 
   const updates: string[] = ['updatedAt = ?'];
@@ -366,6 +486,10 @@ router.put('/todos/:id', (req, res) => {
   if (calendarEventId !== undefined) {
     updates.push(`calendarEventId = ?`);
     params.push(calendarEventId);
+  }
+  if (importance !== undefined) {
+    updates.push(`importance = ?`);
+    params.push(Math.min(5, Math.max(0, parseInt(importance) || 0)));
   }
 
   params.push(id);

@@ -25,6 +25,196 @@ import { playNewCapsuleSound, vibrateFeedback, getSoundPreference, getVibrationP
 // SSE requires full URL - Vite proxy doesn't work with EventSource
 const SSE_URL = 'http://localhost:3000/api/events';
 
+// ============================================================================
+// Reconnection constants
+// ============================================================================
+const MAX_RECONNECT_DELAY = 60000; // 60 seconds max
+const INITIAL_RECONNECT_DELAY = 1000; // 1 second initial
+const HEARTBEAT_INTERVAL = 30000; // 30 seconds
+const MAX_RECONNECT_ATTEMPTS = 5;
+const MISSED_HEARTBEATS_THRESHOLD = 2;
+
+// ============================================================================
+// Connection Status Types
+// ============================================================================
+export type ConnectionStatus = 'connecting' | 'connected' | 'disconnected' | 'reconnecting' | 'failed';
+
+// ============================================================================
+// SSE Singleton - Prevents multiple EventSource connections to same URL
+// Browser HTTP/1.1 limits 6 connections per domain, SSE consumes 1 permanently
+// ============================================================================
+interface SSESubscriber {
+  onEvent?: (event: SSEEvent) => void;
+  onConnect?: () => void;
+  onDisconnect?: () => void;
+  onSSEStatusChange?: (connected: boolean) => void;
+  onConnectionStatusChange?: (status: ConnectionStatus) => void;
+}
+
+interface SSEManager {
+  eventSource: EventSource | null;
+  subscribers: Set<SSESubscriber>;
+  refCount: number;
+  // Reconnection state
+  reconnectAttempts: number;
+  reconnectDelay: number;
+  heartbeatTimer: ReturnType<typeof setInterval> | null;
+  missedHeartbeats: number;
+  isConnected: boolean;
+  connectionStatus: ConnectionStatus;
+}
+
+let sseManager: SSEManager | null = null;
+
+function createSSEManager(url: string): SSEManager {
+  console.log('[SSE Singleton] Creating new EventSource for:', url);
+  
+  const manager: SSEManager = {
+    eventSource: null,
+    subscribers: new Set(),
+    refCount: 0,
+    reconnectAttempts: 0,
+    reconnectDelay: INITIAL_RECONNECT_DELAY,
+    heartbeatTimer: null,
+    missedHeartbeats: 0,
+    isConnected: false,
+    connectionStatus: 'connecting',
+  };
+
+  const connectSSE = () => {
+    // Clear any existing connection
+    if (manager.eventSource) {
+      manager.eventSource.close();
+      manager.eventSource = null;
+    }
+
+    // Clear heartbeat timer
+    if (manager.heartbeatTimer) {
+      clearInterval(manager.heartbeatTimer);
+      manager.heartbeatTimer = null;
+    }
+
+    // Update status to connecting
+    updateConnectionStatus(manager, 'connecting');
+
+    const eventSource = new EventSource(url);
+    manager.eventSource = eventSource;
+
+    // Heartbeat to detect stale connections
+    manager.heartbeatTimer = setInterval(() => {
+      if (manager.isConnected) {
+        manager.isConnected = false;
+        manager.missedHeartbeats++;
+
+        if (manager.missedHeartbeats >= MISSED_HEARTBEATS_THRESHOLD) {
+          console.log('[SSE] Heartbeat missed, reconnecting...');
+          eventSource.close();
+          scheduleReconnect(manager, url, connectSSE);
+        }
+      }
+    }, HEARTBEAT_INTERVAL);
+
+    eventSource.onopen = () => {
+      console.log('[SSE Singleton] Connected');
+      manager.isConnected = true;
+      manager.reconnectAttempts = 0;
+      manager.reconnectDelay = INITIAL_RECONNECT_DELAY;
+      manager.missedHeartbeats = 0;
+      updateConnectionStatus(manager, 'connected');
+      manager.subscribers.forEach((sub) => sub.onSSEStatusChange?.(true));
+      manager.subscribers.forEach((sub) => sub.onConnect?.());
+    };
+
+    eventSource.onerror = (err) => {
+      console.error('[SSE Singleton] Error:', err);
+      manager.isConnected = false;
+      updateConnectionStatus(manager, 'disconnected');
+      eventSource.close();
+      scheduleReconnect(manager, url, connectSSE);
+      manager.subscribers.forEach((sub) => sub.onSSEStatusChange?.(false));
+      manager.subscribers.forEach((sub) => sub.onDisconnect?.());
+    };
+
+    // Handle heartbeat event from server
+    eventSource.addEventListener('heartbeat', () => {
+      manager.isConnected = true;
+      manager.missedHeartbeats = 0;
+    });
+
+    // Handle connection confirmation
+    eventSource.addEventListener('connected', () => {
+      manager.isConnected = true;
+      manager.missedHeartbeats = 0;
+    });
+
+    const eventTypes = [
+      'capsule:created', 'capsule:updated', 'capsule:deleted',
+      'todo:created', 'todo:updated', 'todo:deleted', 'connected',
+    ];
+
+    eventTypes.forEach((eventType) => {
+      eventSource.addEventListener(eventType, (e: MessageEvent) => {
+        const sseEvent: SSEEvent = {
+          type: eventType,
+          data: (() => {
+            try { return JSON.parse(e.data); }
+            catch { return e.data; }
+          })(),
+        };
+        manager.subscribers.forEach((sub) => sub.onEvent?.(sseEvent));
+      });
+    });
+  };
+
+  const scheduleReconnect = (mgr: SSEManager, _url: string, connectFn: () => void) => {
+    if (mgr.reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+      console.log('[SSE Singleton] Max reconnect attempts reached');
+      updateConnectionStatus(mgr, 'failed');
+      return;
+    }
+
+    mgr.reconnectAttempts++;
+    const delay = Math.min(mgr.reconnectDelay, MAX_RECONNECT_DELAY);
+    console.log(`[SSE Singleton] Reconnecting in ${delay}ms (attempt ${mgr.reconnectAttempts})`);
+    updateConnectionStatus(mgr, 'reconnecting');
+
+    setTimeout(() => {
+      connectFn();
+    }, delay);
+
+    // Exponential backoff
+    mgr.reconnectDelay *= 2;
+  };
+
+  const updateConnectionStatus = (mgr: SSEManager, status: ConnectionStatus) => {
+    mgr.connectionStatus = status;
+    mgr.subscribers.forEach((sub) => sub.onConnectionStatusChange?.(status));
+  };
+
+  // Start initial connection
+  connectSSE();
+
+  return manager;
+}
+
+function getSSEManager(url: string): SSEManager {
+  if (sseManager && sseManager.eventSource && sseManager.eventSource.url !== url) {
+    // Different URL requested - close old connection
+    if (sseManager.heartbeatTimer) {
+      clearInterval(sseManager.heartbeatTimer);
+    }
+    sseManager.eventSource.close();
+    sseManager.subscribers.clear();
+    sseManager = null;
+  }
+
+  if (!sseManager) {
+    sseManager = createSSEManager(url);
+  }
+
+  return sseManager;
+}
+
 export interface SSEEvent {
   type: string;
   data: unknown;
@@ -43,10 +233,13 @@ export interface UseSSEOptions {
   onSSEStatusChange?: (connected: boolean) => void;
   /** Optional callback for sync toast notifications - receives event type */
   onSyncToast?: (eventType: string) => void;
+  /** Callback for connection status changes */
+  onConnectionStatusChange?: (status: ConnectionStatus) => void;
 }
 
 /**
  * Custom hook for Server-Sent Events (SSE) connection.
+ * Uses singleton EventSource to prevent multiple connections to same URL.
  * Automatically reconnects on disconnect.
  * Falls back to polling when SSE is unavailable.
  */
@@ -59,22 +252,30 @@ export function useSSE({
   enabled = true,
   fallbackInterval = 10000,
   onSSEStatusChange,
+  onConnectionStatusChange,
 }: UseSSEOptions) {
-  const eventSourceRef = useRef<EventSource | null>(null);
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fallbackIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const onEventRef = useRef(onEvent);
   const onConnectRef = useRef(onConnect);
   const onDisconnectRef = useRef(onDisconnect);
   const onSSEStatusChangeRef = useRef(onSSEStatusChange);
-  
+  const onConnectionStatusChangeRef = useRef(onConnectionStatusChange);
+  const enabledRef = useRef(enabled);
+  const reconnectScheduledRef = useRef(false);
+  const connectRef = useRef<(() => void) | null>(null);
+  const isSubscribedRef = useRef(false);
+
   const [isSSEConnected, setIsSSEConnected] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('connecting');
 
   // Keep refs updated with latest callbacks
   onEventRef.current = onEvent;
   onConnectRef.current = onConnect;
   onDisconnectRef.current = onDisconnect;
   onSSEStatusChangeRef.current = onSSEStatusChange;
+  onConnectionStatusChangeRef.current = onConnectionStatusChange;
+  enabledRef.current = enabled;
 
   // Clear fallback polling
   const clearFallbackPolling = useCallback(() => {
@@ -87,7 +288,7 @@ export function useSSE({
   // Start fallback polling (called when SSE fails)
   const startFallbackPolling = useCallback(() => {
     if (fallbackIntervalRef.current) return; // Already polling
-    
+
     console.log('[SSE] SSE unavailable, starting fallback polling');
     fallbackIntervalRef.current = setInterval(() => {
       // Just trigger a refresh - pages will refetch data
@@ -96,12 +297,7 @@ export function useSSE({
   }, [fallbackInterval]);
 
   const connect = useCallback(() => {
-    if (!enabled) return;
-
-    // Clean up existing connection
-    if (eventSourceRef.current) {
-      eventSourceRef.current.close();
-    }
+    if (!enabledRef.current) return;
 
     // Clear any pending reconnect
     if (reconnectTimeoutRef.current) {
@@ -112,78 +308,87 @@ export function useSSE({
     // Clear fallback polling since we're trying SSE
     clearFallbackPolling();
 
-    console.log('[SSE] Connecting to:', url);
-    const eventSource = new EventSource(url);
-    eventSourceRef.current = eventSource;
+    console.log('[SSE] Connecting to singleton SSE manager:', url);
+    const manager = getSSEManager(url);
+    isSubscribedRef.current = true;
 
-    eventSource.onopen = () => {
-      console.log('[SSE] Connected');
+    // Subscribe to the singleton
+    const subscriber: SSESubscriber = {
+      onEvent,
+      onConnect: () => {
+        setIsSSEConnected(true);
+        reconnectScheduledRef.current = false;
+        onSSEStatusChangeRef.current?.(true);
+        onConnectRef.current?.();
+      },
+      onDisconnect: () => {
+        setIsSSEConnected(false);
+        onSSEStatusChangeRef.current?.(false);
+        onDisconnectRef.current?.();
+
+        // Start fallback polling instead of immediate reconnect
+        startFallbackPolling();
+
+        // Only schedule reconnect if not already scheduled
+        if (enabledRef.current && !reconnectScheduledRef.current) {
+          reconnectScheduledRef.current = true;
+          reconnectTimeoutRef.current = setTimeout(() => {
+            reconnectScheduledRef.current = false;
+            if (enabledRef.current && isSubscribedRef.current) {
+              // Reconnect by re-subscribing
+              connectRef.current?.();
+            }
+          }, reconnectInterval);
+        }
+      },
+      onSSEStatusChange,
+      onConnectionStatusChange: (status) => {
+        setConnectionStatus(status);
+        onConnectionStatusChangeRef.current?.(status);
+      },
+    };
+
+    manager.subscribers.add(subscriber);
+
+    // Check initial connection state
+    if (manager.eventSource?.readyState === EventSource.OPEN) {
       setIsSSEConnected(true);
       onSSEStatusChangeRef.current?.(true);
-      onConnectRef.current?.();
-    };
+    }
+  }, [url, reconnectInterval, clearFallbackPolling, startFallbackPolling]);
 
-    eventSource.onerror = () => {
-      console.log('[SSE] Error, closing connection');
-      eventSource.close();
-      setIsSSEConnected(false);
-      onSSEStatusChangeRef.current?.(false);
-      onDisconnectRef.current?.();
-
-      // Start fallback polling instead of immediate reconnect
-      startFallbackPolling();
-      
-      // Also try to reconnect SSE after interval
-      if (enabled) {
-        reconnectTimeoutRef.current = setTimeout(() => {
-          // Check if we should still try reconnecting
-          if (enabled && !isSSEConnected) {
-            connect();
-          }
-        }, reconnectInterval);
-      }
-    };
-
-    // Listen for all custom event types
-    const eventTypes = [
-      'capsule:created',
-      'capsule:updated',
-      'capsule:deleted',
-      'todo:created',
-      'todo:updated',
-      'todo:deleted',
-      'connected',
-    ];
-
-    eventTypes.forEach((eventType) => {
-      eventSource.addEventListener(eventType, (e: MessageEvent) => {
-        try {
-          const data = JSON.parse(e.data) as unknown;
-          onEventRef.current?.({ type: eventType, data });
-        } catch {
-          onEventRef.current?.({ type: eventType, data: e.data });
-        }
-      });
-    });
-  }, [url, reconnectInterval, enabled, clearFallbackPolling, startFallbackPolling, isSSEConnected]);
+  // Store connect function in ref so error handler can call it without forward reference issues
+  connectRef.current = connect;
 
   useEffect(() => {
     connect();
 
     return () => {
+      isSubscribedRef.current = false;
       if (reconnectTimeoutRef.current) {
         clearTimeout(reconnectTimeoutRef.current);
       }
       if (fallbackIntervalRef.current) {
         clearInterval(fallbackIntervalRef.current);
       }
-      if (eventSourceRef.current) {
-        eventSourceRef.current.close();
-      }
+      // Unsubscribe from singleton but don't close the connection
+      // Other subscribers may still need it
     };
   }, [connect]);
 
-  return { isSSEConnected };
+  // Manual retry function - resets reconnect state and reconnects
+  const retryConnection = useCallback(() => {
+    if (sseManager) {
+      sseManager.reconnectAttempts = 0;
+      sseManager.reconnectDelay = INITIAL_RECONNECT_DELAY;
+      sseManager.isConnected = false;
+      setConnectionStatus('reconnecting');
+      // Trigger a reconnect by calling connect
+      connectRef.current?.();
+    }
+  }, []);
+
+  return { isSSEConnected, connectionStatus, retryConnection };
 }
 
 /**
@@ -201,7 +406,7 @@ export function useCapsuleSync(
     /** Whether silent mode is active - suppresses toasts */
     isSilent?: boolean;
   }
-): { isSSEConnected: boolean } {
+): { isSSEConnected: boolean; connectionStatus: ConnectionStatus; retryConnection: () => void } {
   const onCapsuleUpdateRef = useRef(onCapsuleUpdate);
   const onSyncToastRef = useRef(options?.onSyncToast);
   const isSilentRef = useRef(options?.isSilent);
@@ -209,7 +414,7 @@ export function useCapsuleSync(
   onSyncToastRef.current = options?.onSyncToast;
   isSilentRef.current = options?.isSilent;
 
-  const { isSSEConnected } = useSSE({
+  const { isSSEConnected, connectionStatus, retryConnection } = useSSE({
     url: SSE_URL,
     onEvent: (event) => {
       // Handle both SSE events and fallback polling
@@ -237,7 +442,7 @@ export function useCapsuleSync(
     enabled: true,
   });
 
-  return { isSSEConnected };
+  return { isSSEConnected, connectionStatus, retryConnection };
 }
 
 /**
@@ -254,7 +459,7 @@ export function useTodoSync(
     /** Whether silent mode is active - suppresses toasts */
     isSilent?: boolean;
   }
-): { isSSEConnected: boolean } {
+): { isSSEConnected: boolean; connectionStatus: ConnectionStatus; retryConnection: () => void } {
   const onTodoUpdateRef = useRef(onTodoUpdate);
   const onSyncToastRef = useRef(options?.onSyncToast);
   const isSilentRef = useRef(options?.isSilent);
@@ -262,7 +467,7 @@ export function useTodoSync(
   onSyncToastRef.current = options?.onSyncToast;
   isSilentRef.current = options?.isSilent;
 
-  const { isSSEConnected } = useSSE({
+  const { isSSEConnected, connectionStatus, retryConnection } = useSSE({
     url: SSE_URL,
     onEvent: (event) => {
       if (event.type.startsWith('todo:') || event.type === 'fallback:poll') {
@@ -278,5 +483,5 @@ export function useTodoSync(
     enabled: true,
   });
 
-  return { isSSEConnected };
+  return { isSSEConnected, connectionStatus, retryConnection };
 }

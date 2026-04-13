@@ -92,7 +92,8 @@ export const db = new sqlite.Database(dbPath, (err) => {
         updatedAt INTEGER,
         syncedAt INTEGER,
         localId TEXT,
-        calendarEventId TEXT
+        calendarEventId TEXT,
+        importance INTEGER DEFAULT 0
       )
     `);
 
@@ -104,5 +105,6 @@ export const db = new sqlite.Database(dbPath, (err) => {
     db.run(`ALTER TABLE todos ADD COLUMN syncedAt INTEGER`, (err) => {});
     db.run(`ALTER TABLE todos ADD COLUMN localId TEXT`, (err) => {});
     db.run(`ALTER TABLE todos ADD COLUMN calendarEventId TEXT`, (err) => {});
+    db.run(`ALTER TABLE todos ADD COLUMN importance INTEGER DEFAULT 0`, (err) => {});
   }
 });

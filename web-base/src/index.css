@@ -44,6 +44,15 @@
   --shadow-raised: 0 8px 24px rgba(0, 0, 0, 0.4), 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
+/* === 定制颜色变量 (由 ThemeContext 控制) === */
+:root {
+  --color-custom-primary: #4a7a9b;
+  --color-custom-secondary: #3d8b7a;
+  --color-custom-bg: #0b0e14;
+  --color-custom-surface: #0d1117;
+  --border-radius: 8px;
+}
+
 /* === 日间模式 - 温暖纸感 === */
 [data-theme="day"] {
   --color-base-bg: #f0ece4;
@@ -166,7 +175,7 @@ code, pre, .font-mono {
 .panel {
   background: var(--color-base-panel);
   border: 1px solid var(--color-base-border);
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   box-shadow: var(--shadow-panel);
   transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
@@ -387,7 +396,7 @@ input:focus, textarea:focus {
 .card {
   background: var(--color-base-panel-raised);
   border: 1px solid var(--color-base-border);
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   box-shadow: var(--shadow-panel);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
@@ -1022,4 +1031,81 @@ input:focus, textarea:focus {
   opacity: 0;
   transform: scale(0.9) translateY(10px);
   transition: all 250ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* === 定制颜色应用层 === */
+/* 当用户自定义颜色时，这些规则会覆盖默认颜色 */
+/* 通过 CSS 变量 --color-custom-* 应用 */
+
+[data-custom-colors="true"] {
+  /* Primary color - 用于 accent 元素 */
+  --color-base-accent: var(--color-custom-primary);
+  
+  /* Success 颜色使用 secondary */
+  --color-base-success: var(--color-custom-secondary);
+}
+
+/* 定制颜色面板背景 */
+[data-custom-colors="true"] .panel,
+[data-custom-colors="true"] .card {
+  background: var(--color-custom-surface);
+}
+
+/* 定制颜色页面背景 */
+[data-custom-colors="true"] body,
+[data-custom-colors="true"] .main-workstation {
+  background-color: var(--color-custom-bg);
+}
+
+/* 定制 Primary 按钮 */
+[data-custom-colors="true"] .btn-primary {
+  background: var(--color-custom-primary);
+}
+
+/* 定制 Primary 强调元素 */
+[data-custom-colors="true"] .text-accent,
+[data-custom-colors="true"] [class*="accent"] {
+  color: var(--color-custom-primary) !important;
+}
+
+/* 定制 Primary 背景元素 */
+[data-custom-colors="true"] .bg-accent,
+[data-custom-colors="true"] [class*="accent-bg"] {
+  background-color: var(--color-custom-primary) !important;
+}
+
+/* 定制 Primary 边框元素 */
+[data-custom-colors="true"] .border-accent,
+[data-custom-colors="true"] [class*="accent-border"] {
+  border-color: var(--color-custom-primary) !important;
+}
+
+/* Input fields use custom surface */
+[data-custom-colors="true"] input,
+[data-custom-colors="true"] textarea {
+  background: var(--color-custom-surface);
+}
+
+/* === Windows-style Settings Window Frame === */
+.window-frame {
+  background: var(--color-base-panel);
+  border-radius: 8px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  border: 1px solid var(--color-base-border);
+}
+
+.window-titlebar {
+  background: var(--color-base-surface);
+  border-bottom: 1px solid var(--color-base-border);
+}
+
+.window-control {
+  color: var(--color-base-text);
+  transition: background-color 0.15s ease;
+}
+.window-control:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+.window-control:last-child:hover {
+  background: #dc2626;
 }

@@ -9,6 +9,8 @@ import ArchivePage from './pages/Archive';
 import TodosPage from './pages/Todos';
 import SettingsPage from './pages/Settings';
 import { ToastProvider } from './hooks/useToast';
+import { useConnectionStatus } from './hooks/useConnectionStatus';
+import { ThemeProvider } from './context/ThemeContext';
 
 // Animation intensity type
 export type AnimationIntensity = 'off' | 'low' | 'medium' | 'high';
@@ -28,6 +30,7 @@ export const useAnimation = () => useContext(AnimationContext);
 
 const AppContent: React.FC = () => {
   const location = useLocation();
+  const { isConnected: backendConnected } = useConnectionStatus();
   
   // 静默模式状态 - 简化的静默开关
   const [silentMode, setSilentMode] = useState(() => {
@@ -37,27 +40,36 @@ const AppContent: React.FC = () => {
     return false;
   });
   
-  // 主题偏好状态 - 强制默认为 'auto'，忽略 localStorage
-  const [themePreference, setThemePreference] = useState<'day' | 'night' | 'auto'>('auto');
+  // 主题偏好状态 - 从 localStorage 读取，默认为 'auto'
+  const [themePreference, setThemePreference] = useState<'day' | 'night' | 'auto'>(() => {
+    const saved = localStorage.getItem('themePreference');
+    if (saved === 'day' || saved === 'night' || saved === 'auto') {
+      return saved;
+    }
+    return 'auto';
+  });
 
-  // 组件挂载时强制重置为 'auto'（使用 ref 确保只执行一次）
+  // 组件挂载时，如果 localStorage 没有偏好，则设为 'auto'（仅首次）
   const initRef = React.useRef(false);
   useEffect(() => {
     if (initRef.current) return;
     initRef.current = true;
-    // 强制设为 'auto'
-    localStorage.setItem('themePreference', 'auto');
-    setThemePreference('auto');
+    if (!localStorage.getItem('themePreference')) {
+      localStorage.setItem('themePreference', 'auto');
+      setThemePreference('auto');
+    }
   }, []);
+
+  // 当前时间的小时数，用于自动主题计算
+  const [now, setNow] = useState(() => new Date().getHours());
 
   // 有效主题：根据偏好或系统时间计算
   const effectiveTheme = useMemo(() => {
     if (themePreference === 'auto') {
-      const hour = new Date().getHours();
-      return hour >= 6 && hour < 18 ? 'day' : 'night';
+      return now >= 6 && now < 18 ? 'day' : 'night';
     }
     return themePreference;
-  }, [themePreference]);
+  }, [themePreference, now]);
 
   // 是否为白天（用于UI装饰）
   const isDay = effectiveTheme === 'day';
@@ -99,8 +111,7 @@ const AppContent: React.FC = () => {
     if (themePreference !== 'auto') return;
 
     const checkTheme = () => {
-      // effectiveTheme 会在 themePreference === 'auto' 时根据时间计算
-      // 这里只需要触发一次重新渲染即可
+      setNow(new Date().getHours());
     };
     checkTheme();
     const interval = setInterval(checkTheme, 60000);
@@ -131,8 +142,9 @@ const AppContent: React.FC = () => {
 
   return (
     <ToastProvider isSilent={silentMode}>
-      <AnimationContext.Provider value={animationContext}>
-        <div
+      <ThemeProvider>
+        <AnimationContext.Provider value={animationContext}>
+          <div
         data-silent={silentMode ? "true" : "false"}
         data-animation-intensity={animationIntensity}
         data-motion-enabled={motionEnabled ? "true" : "false"}
@@ -145,7 +157,7 @@ const AppContent: React.FC = () => {
           themeMode={themePreference}
           effectiveTheme={effectiveTheme}
           onThemeModeChange={handleThemeModeChange}
-          isLANConnected={!silentMode}
+          isLANConnected={backendConnected}
         />
 
         {/* 主内容区 - 在TopNav下方，自动填满剩余空间 */}
@@ -247,6 +259,7 @@ const AppContent: React.FC = () => {
         </div>
       </div>
       </AnimationContext.Provider>
+      </ThemeProvider>
     </ToastProvider>
   );
 };

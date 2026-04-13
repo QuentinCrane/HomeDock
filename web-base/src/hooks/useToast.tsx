@@ -61,7 +61,16 @@ export function ToastProvider({ children, isSilent = false }: { children: React.
     if (isSilent) return;
 
     const id = `toast-${++toastIdRef.current}`;
-    setToasts(prev => [...prev, { id, message, type, duration }]);
+    setToasts(prev => {
+      // Limit to 5 toasts maximum
+      const MAX_TOASTS = 5;
+      const newToasts = [...prev, { id, message, type, duration }];
+      // If over limit, remove oldest (first element)
+      if (newToasts.length > MAX_TOASTS) {
+        return newToasts.slice(1);
+      }
+      return newToasts;
+    });
   }, [isSilent]);
 
   const removeToast = useCallback((id: string) => {
@@ -91,13 +100,20 @@ function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: string) =
   const [isExiting, setIsExiting] = useState(false);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
+    let innerTimer: ReturnType<typeof setTimeout> | undefined;
+
+    const outerTimer = setTimeout(() => {
       setIsExiting(true);
       // Allow exit animation to complete before removing
-      setTimeout(() => onRemove(toast.id), 200);
+      innerTimer = setTimeout(() => {
+        onRemove(toast.id);
+      }, 200);
     }, toast.duration);
 
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(outerTimer);
+      if (innerTimer) clearTimeout(innerTimer);
+    };
   }, [toast.id, toast.duration, onRemove]);
 
   const typeStyles: Record<ToastType, string> = {

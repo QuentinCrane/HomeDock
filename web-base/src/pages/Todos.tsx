@@ -42,13 +42,197 @@ import {
   CheckCircle2,
   Circle,
   AlertCircle,
-  Link2
+  Link2,
+  Star,
+  List,
+  Grid3X3,
+  ChevronLeft,
+  ChevronDown
 } from 'lucide-react';
 import dayjs from 'dayjs';
 import { useTodoSync } from '../hooks/useSSE';
 
 /// 标签页类型
 type TabFilter = 'active' | 'completed';
+
+/// 视图模式类型
+type ViewMode = 'list' | 'calendar';
+
+/// 重要性星级组件 - 显示用
+const ImportanceStars: React.FC<{ importance: number; size?: number }> = ({ importance, size = 12 }) => (
+  <div className="flex items-center gap-0.5">
+    {[1, 2, 3, 4, 5].map((star) => (
+      <Star
+        key={star}
+        size={size}
+        className={star <= importance 
+          ? 'text-yellow-500 fill-yellow-500' 
+          : 'text-[var(--color-base-border)]'
+        }
+      />
+    ))}
+  </div>
+);
+
+/// 重要性星级选择器 - 编辑用
+const ImportanceSelector: React.FC<{ 
+  value: number; 
+  onChange: (value: number) => void 
+}> = ({ value, onChange }) => (
+  <div className="flex items-center gap-1">
+    {[1, 2, 3, 4, 5].map((star) => (
+      <button
+        key={star}
+        type="button"
+        onClick={() => onChange(star === value ? 0 : star)}
+        className="p-0.5 transition-transform hover:scale-110"
+      >
+        <Star
+          size={20}
+          className={star <= value 
+            ? 'text-yellow-500 fill-yellow-500' 
+            : 'text-[var(--color-base-border)] hover:text-yellow-500/50'
+          }
+        />
+      </button>
+    ))}
+    {value > 0 && (
+      <button
+        type="button"
+        onClick={() => onChange(0)}
+        className="ml-2 text-[10px] font-mono text-[var(--color-base-text)] hover:text-[var(--color-base-error)]"
+      >
+        清除
+      </button>
+    )}
+  </div>
+);
+
+/// 日历视图组件
+const CalendarView: React.FC<{
+  todos: Todo[];
+  currentDate: Date;
+  selectedDate: Date | null;
+  onDateSelect: (date: Date | null) => void;
+  onMonthChange: (direction: 'prev' | 'next') => void;
+}> = ({ todos, currentDate, selectedDate, onDateSelect, onMonthChange }) => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  
+  const year = currentDate.getFullYear();
+  const month = currentDate.getMonth();
+  
+  // Get first day of month and total days
+  const firstDay = new Date(year, month, 1);
+  const lastDay = new Date(year, month + 1, 0);
+  const startDayOfWeek = firstDay.getDay();
+  const daysInMonth = lastDay.getDate();
+  
+  // Create todo count map by date
+  const todoCountMap = new Map<string, number>();
+  todos.forEach(todo => {
+    if (todo.dueDate) {
+      const d = new Date(todo.dueDate);
+      d.setHours(0, 0, 0, 0);
+      const key = d.toISOString().split('T')[0];
+      todoCountMap.set(key, (todoCountMap.get(key) || 0) + 1);
+    }
+  });
+  
+  // Get selected date key
+  const selectedKey = selectedDate 
+    ? new Date(selectedDate).toISOString().split('T')[0]
+    : null;
+
+  const weekDays = ['日', '一', '二', '三', '四', '五', '六'];
+
+  return (
+    <div className="bg-[var(--color-base-panel)] border border-[var(--color-base-border)] p-4">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-4">
+        <button
+          onClick={() => onMonthChange('prev')}
+          className="p-1.5 hover:bg-[var(--color-base-border)] transition-colors"
+        >
+          <ChevronLeft size={16} className="text-[var(--color-base-text)]" />
+        </button>
+        <h3 className="text-sm font-mono text-[var(--color-base-text-bright)] tracking-widest">
+          {year} 年 {month + 1} 月
+        </h3>
+        <button
+          onClick={() => onMonthChange('next')}
+          className="p-1.5 hover:bg-[var(--color-base-border)] transition-colors"
+        >
+          <ChevronDown size={16} className="text-[var(--color-base-text)] rotate-90" />
+        </button>
+      </div>
+
+      {/* Weekday headers */}
+      <div className="grid grid-cols-7 gap-1 mb-2">
+        {weekDays.map((day) => (
+          <div key={day} className="text-center text-[10px] font-mono text-[var(--color-base-text)] opacity-60 py-1">
+            {day}
+          </div>
+        ))}
+      </div>
+
+      {/* Calendar grid */}
+      <div className="grid grid-cols-7 gap-1">
+        {/* Empty cells for days before month starts */}
+        {Array.from({ length: startDayOfWeek }).map((_, idx) => (
+          <div key={`empty-${idx}`} className="aspect-square" />
+        ))}
+        
+        {/* Days of month */}
+        {Array.from({ length: daysInMonth }).map((_, idx) => {
+          const day = idx + 1;
+          const date = new Date(year, month, day);
+          date.setHours(0, 0, 0, 0);
+          const key = date.toISOString().split('T')[0];
+          const count = todoCountMap.get(key) || 0;
+          const isToday = date.getTime() === today.getTime();
+          const isSelected = key === selectedKey;
+          
+          return (
+            <button
+              key={day}
+              onClick={() => onDateSelect(count > 0 ? date : null)}
+              className={`
+                aspect-square flex flex-col items-center justify-center rounded
+                text-xs font-mono transition-colors relative
+                ${isSelected 
+                  ? 'bg-[var(--color-base-accent)] text-[var(--color-base-bg)]' 
+                  : isToday 
+                    ? 'bg-[var(--color-base-border)] text-[var(--color-base-text-bright)]'
+                    : 'hover:bg-[var(--color-base-border)] text-[var(--color-base-text)]'
+                }
+              `}
+            >
+              <span>{day}</span>
+              {count > 0 && (
+                <span className={`absolute bottom-0.5 w-1.5 h-1.5 rounded-full ${
+                  isSelected ? 'bg-[var(--color-base-bg)]' : 'bg-[var(--color-base-accent)]'
+                }`} />
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Selected date info */}
+      {selectedDate && (
+        <div className="mt-4 pt-4 border-t border-[var(--color-base-border)]">
+          <p className="text-xs font-mono text-[var(--color-base-text)] mb-2">
+            {dayjs(selectedDate).format('YYYY 年 MM 月 DD 日')} 
+            <span className="ml-2 text-[var(--color-base-accent)]">
+              {todoCountMap.get(selectedDate.toISOString().split('T')[0]) || 0} 项待办
+            </span>
+          </p>
+        </div>
+      )}
+    </div>
+  );
+};
 
 /// 加载中旋转动画组件
 const LoadingSpinner = () => (
@@ -98,19 +282,26 @@ const TodosPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabFilter>('active');
+  const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [selectedTodo, setSelectedTodo] = useState<Todo | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
+
+  // Calendar state
+  const [calendarDate, setCalendarDate] = useState(new Date());
+  const [selectedCalendarDate, setSelectedCalendarDate] = useState<Date | null>(null);
 
   // Edit form state
   const [editTitle, setEditTitle] = useState('');
   const [editDescription, setEditDescription] = useState('');
   const [editDueDate, setEditDueDate] = useState('');
+  const [editImportance, setEditImportance] = useState(0);
 
   // Create form state
   const [newTitle, setNewTitle] = useState('');
   const [newDescription, setNewDescription] = useState('');
   const [newDueDate, setNewDueDate] = useState('');
+  const [newImportance, setNewImportance] = useState(0);
   const [isCreating, setIsCreating] = useState(false);
 
   const loadTodos = async () => {
@@ -144,6 +335,7 @@ const TodosPage: React.FC = () => {
     setEditTitle(todo.title);
     setEditDescription(todo.description || '');
     setEditDueDate(todo.dueDate ? dayjs(todo.dueDate).format('YYYY-MM-DD') : '');
+    setEditImportance(todo.importance || 0);
     setIsEditing(false);
   };
 
@@ -168,6 +360,7 @@ const TodosPage: React.FC = () => {
         title: editTitle,
         description: editDescription || undefined,
         dueDate: editDueDate ? new Date(editDueDate).getTime() : undefined,
+        importance: editImportance || undefined,
       });
       setIsEditing(false);
       loadTodos();
@@ -197,11 +390,13 @@ const TodosPage: React.FC = () => {
         title: newTitle,
         description: newDescription || undefined,
         dueDate: newDueDate ? new Date(newDueDate).getTime() : undefined,
+        importance: newImportance || undefined,
       });
       setShowCreateModal(false);
       setNewTitle('');
       setNewDescription('');
       setNewDueDate('');
+      setNewImportance(0);
       loadTodos();
     } catch (err) {
       setError('创建失败，请重试');
@@ -220,6 +415,37 @@ const TodosPage: React.FC = () => {
     // Create calendar URL (works on Android and iOS)
     const calendarUrl = `intent://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${startDate}/${endDate}&details=${details}#Intent;scheme=https;package=com.google.android.gm;end`;
     window.open(calendarUrl, '_blank');
+  };
+
+  const handleCalendarMonthChange = (direction: 'prev' | 'next') => {
+    setCalendarDate(prev => {
+      const newDate = new Date(prev);
+      if (direction === 'prev') {
+        newDate.setMonth(newDate.getMonth() - 1);
+      } else {
+        newDate.setMonth(newDate.getMonth() + 1);
+      }
+      return newDate;
+    });
+  };
+
+  const handleCalendarDateSelect = (date: Date | null) => {
+    setSelectedCalendarDate(date);
+    if (date) {
+      setViewMode('list');
+    }
+  };
+
+  // Filter todos by selected calendar date
+  const getFilteredTodosForCalendar = () => {
+    if (!selectedCalendarDate) return filteredTodos;
+    const selectedKey = selectedCalendarDate.toISOString().split('T')[0];
+    return filteredTodos.filter(todo => {
+      if (!todo.dueDate) return false;
+      const todoDate = new Date(todo.dueDate);
+      todoDate.setHours(0, 0, 0, 0);
+      return todoDate.toISOString().split('T')[0] === selectedKey;
+    });
   };
 
   const activeCount = todos.filter(t => !t.completed).length;
@@ -241,13 +467,38 @@ const TodosPage: React.FC = () => {
           待办清单
         </h2>
 
-        <button
-          onClick={() => setShowCreateModal(true)}
-          className="flex items-center gap-1 px-3 py-1.5 bg-[var(--color-base-accent)]/20 text-[var(--color-base-accent)] font-mono text-xs hover:bg-[var(--color-base-accent)]/30 transition-colors"
-        >
-          <Plus size={14} />
-          新建
-        </button>
+        <div className="flex items-center gap-3">
+          {/* 视图切换 */}
+          <div className="flex items-center gap-1 bg-[var(--color-base-bg)] border border-[var(--color-base-border)] px-1">
+            <button
+              onClick={() => setViewMode('list')}
+              className={`p-1.5 transition-colors ${viewMode === 'list' 
+                ? 'text-[var(--color-base-accent)]' 
+                : 'text-[var(--color-base-text)] hover:text-[var(--color-base-text-light)]'
+              }`}
+              title="列表视图"
+            >
+              <List size={14} />
+            </button>
+            <button
+              onClick={() => setViewMode('calendar')}
+              className={`p-1.5 transition-colors ${viewMode === 'calendar' 
+                ? 'text-[var(--color-base-accent)]' 
+                : 'text-[var(--color-base-text)] hover:text-[var(--color-base-text-light)]'
+              }`}
+              title="日历视图"
+            >
+              <Grid3X3 size={14} />
+            </button>
+          </div>
+          <button
+            onClick={() => setShowCreateModal(true)}
+            className="flex items-center gap-1 px-3 py-1.5 bg-[var(--color-base-accent)]/20 text-[var(--color-base-accent)] font-mono text-xs hover:bg-[var(--color-base-accent)]/30 transition-colors"
+          >
+            <Plus size={14} />
+            新建
+          </button>
+        </div>
       </div>
 
       {/* 错误提示 */}
@@ -259,10 +510,10 @@ const TodosPage: React.FC = () => {
 
       {/* 主体：两栏布局 */}
       <div className="flex-1 flex gap-6 overflow-hidden">
-        {/* ── 左栏：列表 ── */}
+        {/* ── 左栏：列表/日历 ── */}
         <div className="flex-1 flex flex-col overflow-hidden">
           {/* 标签页 */}
-          <div className="flex gap-4 mb-4">
+          <div className="flex gap-4 mb-4 items-center">
             <button
               onClick={() => setActiveTab('active')}
               className={`px-3 py-1.5 text-xs font-mono tracking-widest transition-colors flex items-center gap-2 ${
@@ -291,85 +542,117 @@ const TodosPage: React.FC = () => {
                 {completedCount}
               </span>
             </button>
-          </div>
-
-          {/* 列表 */}
-          <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar pb-10">
-            {loading ? (
-              <LoadingSpinner />
-            ) : filteredTodos.length === 0 ? (
-              <div className="h-full flex items-center justify-center">
-                <p className="text-sm font-mono text-[var(--color-base-text)] tracking-widest animate-pulse">
-                  {activeTab === 'active' ? '暂无进行中事项' : '暂无已完成事项'}
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {filteredTodos.map((todo, idx) => (
-                  <motion.div
-                    key={todo.id}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: idx * 0.04 }}
-                    onClick={() => handleSelectTodo(todo)}
-                    className={`p-4 cursor-pointer transition-colors ${
-                      selectedTodo?.id === todo.id
-                        ? 'bg-[var(--color-base-border-highlight)]/30 border border-[var(--color-base-border-highlight)]'
-                        : 'bg-[var(--color-base-panel)] border border-[var(--color-base-border)] hover:border-[var(--color-base-border-highlight)]'
-                    } ${todo.completed ? 'opacity-60' : ''}`}
-                  >
-                    <div className="flex items-start gap-3">
-                      {/* 完成状态按钮 */}
-                      <button
-                        onClick={(e) => handleToggleComplete(todo, e)}
-                        className={`mt-0.5 flex-shrink-0 transition-colors ${
-                          todo.completed 
-                            ? 'text-[var(--color-base-success)]' 
-                            : 'text-[var(--color-base-text)] hover:text-[var(--color-base-accent)]'
-                        }`}
-                      >
-                        {todo.completed ? <CheckCircle2 size={18} /> : <Circle size={18} />}
-                      </button>
-
-                      {/* 内容 */}
-                      <div className="flex-1 min-w-0">
-                        <p className={`text-sm font-sans leading-relaxed ${
-                          todo.completed ? 'line-through text-[var(--color-base-text)]' : 'text-[var(--color-base-text-light)]'
-                        }`}>
-                          {todo.title}
-                        </p>
-                        {todo.description && (
-                          <p className="text-xs text-[var(--color-base-text)] mt-1 line-clamp-1 opacity-70">
-                            {todo.description}
-                          </p>
-                        )}
-                        <div className="flex items-center gap-3 mt-2">
-                          {todo.dueDate && (
-                            <span className={`text-[10px] font-mono flex items-center gap-1 ${
-                              todo.dueDate < Date.now() && !todo.completed 
-                                ? 'text-[var(--color-base-error)]' 
-                                : 'text-[var(--color-base-text)] opacity-60'
-                            }`}>
-                              <Calendar size={10} />
-                              {dayjs(todo.dueDate).format('MM-DD')}
-                            </span>
-                          )}
-                          {todo.calendarEventId && (
-                            <span className="text-[10px] font-mono text-[var(--color-base-accent)] opacity-60 flex items-center gap-1">
-                              <Link2 size={10} />
-                              已同步
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      <ChevronRight size={14} className="text-[var(--color-base-text)] opacity-30 mt-1" />
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
+            
+            {/* Calendar date filter indicator */}
+            {selectedCalendarDate && (
+              <button
+                onClick={() => setSelectedCalendarDate(null)}
+                className="ml-auto px-2 py-1 text-[10px] font-mono text-[var(--color-base-accent)] bg-[var(--color-base-accent)]/10 border border-[var(--color-base-accent)]/30 flex items-center gap-1 hover:bg-[var(--color-base-accent)]/20 transition-colors"
+              >
+                <Calendar size={10} />
+                {dayjs(selectedCalendarDate).format('MM-DD')}
+                <X size={10} />
+              </button>
             )}
           </div>
+
+          {/* 日历视图或列表视图 */}
+          {viewMode === 'calendar' ? (
+            <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar pb-10">
+              <CalendarView
+                todos={filteredTodos}
+                currentDate={calendarDate}
+                selectedDate={selectedCalendarDate}
+                onDateSelect={handleCalendarDateSelect}
+                onMonthChange={handleCalendarMonthChange}
+              />
+            </div>
+          ) : (
+            /* 列表 */
+            <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar pb-10">
+              {loading ? (
+                <LoadingSpinner />
+              ) : getFilteredTodosForCalendar().length === 0 ? (
+                <div className="h-full flex items-center justify-center">
+                  <p className="text-sm font-mono text-[var(--color-base-text)] tracking-widest animate-pulse">
+                    {selectedCalendarDate 
+                      ? '所选日期没有待办事项' 
+                      : activeTab === 'active' ? '暂无进行中事项' : '暂无已完成事项'}
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {getFilteredTodosForCalendar().map((todo, idx) => (
+                    <motion.div
+                      key={todo.id}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: idx * 0.04 }}
+                      onClick={() => handleSelectTodo(todo)}
+                      className={`p-4 cursor-pointer transition-colors ${
+                        selectedTodo?.id === todo.id
+                          ? 'bg-[var(--color-base-border-highlight)]/30 border border-[var(--color-base-border-highlight)]'
+                          : 'bg-[var(--color-base-panel)] border border-[var(--color-base-border)] hover:border-[var(--color-base-border-highlight)]'
+                      } ${todo.completed ? 'opacity-60' : ''}`}
+                    >
+                      <div className="flex items-start gap-3">
+                        {/* 完成状态按钮 */}
+                        <button
+                          onClick={(e) => handleToggleComplete(todo, e)}
+                          className={`mt-0.5 flex-shrink-0 transition-colors ${
+                            todo.completed 
+                              ? 'text-[var(--color-base-success)]' 
+                              : 'text-[var(--color-base-text)] hover:text-[var(--color-base-accent)]'
+                          }`}
+                        >
+                          {todo.completed ? <CheckCircle2 size={18} /> : <Circle size={18} />}
+                        </button>
+
+                        {/* 内容 */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <p className={`text-sm font-sans leading-relaxed flex-1 ${
+                              todo.completed ? 'line-through text-[var(--color-base-text)]' : 'text-[var(--color-base-text-light)]'
+                            }`}>
+                              {todo.title}
+                            </p>
+                            {todo.importance && todo.importance > 0 && (
+                              <ImportanceStars importance={todo.importance} size={10} />
+                            )}
+                          </div>
+                          {todo.description && (
+                            <p className="text-xs text-[var(--color-base-text)] mt-1 line-clamp-1 opacity-70">
+                              {todo.description}
+                            </p>
+                          )}
+                          <div className="flex items-center gap-3 mt-2">
+                            {todo.dueDate && (
+                              <span className={`text-[10px] font-mono flex items-center gap-1 ${
+                                todo.dueDate < Date.now() && !todo.completed 
+                                  ? 'text-[var(--color-base-error)]' 
+                                  : 'text-[var(--color-base-text)] opacity-60'
+                              }`}>
+                                <Calendar size={10} />
+                                {dayjs(todo.dueDate).format('MM-DD')}
+                              </span>
+                            )}
+                            {todo.calendarEventId && (
+                              <span className="text-[10px] font-mono text-[var(--color-base-accent)] opacity-60 flex items-center gap-1">
+                                <Link2 size={10} />
+                                已同步
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        <ChevronRight size={14} className="text-[var(--color-base-text)] opacity-30 mt-1" />
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* ── 右栏：详情面板 ── */}
@@ -431,12 +714,23 @@ const TodosPage: React.FC = () => {
                         className="w-full px-3 py-2 bg-[var(--color-base-bg)] border border-[var(--color-base-border)] text-sm text-[var(--color-base-text-light)] focus:outline-none focus:border-[var(--color-base-accent)] font-mono"
                       />
                     </div>
+                    <div>
+                      <label className="text-[10px] font-mono text-[var(--color-base-text)] tracking-widest uppercase block mb-1.5">
+                        重要性
+                      </label>
+                      <ImportanceSelector value={editImportance} onChange={setEditImportance} />
+                    </div>
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    <h3 className="text-lg font-sans text-[var(--color-base-text-bright)] leading-relaxed">
-                      {selectedTodo.title}
-                    </h3>
+                    <div className="flex items-start justify-between gap-2">
+                      <h3 className="text-lg font-sans text-[var(--color-base-text-bright)] leading-relaxed flex-1">
+                        {selectedTodo.title}
+                      </h3>
+                      {selectedTodo.importance && selectedTodo.importance > 0 && (
+                        <ImportanceStars importance={selectedTodo.importance} size={14} />
+                      )}
+                    </div>
                     {selectedTodo.description && (
                       <p className="text-sm text-[var(--color-base-text-light)] font-sans leading-relaxed whitespace-pre-wrap">
                         {selectedTodo.description}
@@ -626,6 +920,12 @@ const TodosPage: React.FC = () => {
                     onChange={(e) => setNewDueDate(e.target.value)}
                     className="w-full px-3 py-2 bg-[var(--color-base-bg)] border border-[var(--color-base-border)] text-sm text-[var(--color-base-text-light)] focus:outline-none focus:border-[var(--color-base-accent)] font-mono"
                   />
+                </div>
+                <div>
+                  <label className="text-[10px] font-mono text-[var(--color-base-text)] tracking-widest uppercase block mb-1.5">
+                    重要性
+                  </label>
+                  <ImportanceSelector value={newImportance} onChange={setNewImportance} />
                 </div>
               </div>
 

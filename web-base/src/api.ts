@@ -15,8 +15,76 @@ import axios from 'axios';
 /// API 客户端配置 - 基础 URL 指向本地 Express 服务器
 /// 开发环境：Vite dev server (5173) 通过代理或直接访问 API (3000)
 export const api = axios.create({
-  baseURL: 'http://localhost:3000/api',
+  baseURL: '/api',
 });
+
+// Retry interceptor - exponential backoff: 1s → 2s → 4s → 8s → 16s (per-request tracking)
+const MAX_RETRIES = 3;
+const MAX_UPLOAD_RETRIES = 5;
+
+export interface UploadProgress {
+  loaded: number;
+  total: number;
+  percent: number;
+}
+
+export interface CreateCapsuleOptions {
+  type: 'text' | 'image' | 'audio';
+  content?: string;
+  file?: File;
+  timestamp?: number;
+  status?: CapsuleStatus;
+  onUploadProgress?: (percent: number) => void;
+}
+
+export interface CreateCapsuleResult {
+  id: number;
+  message: string;
+}
+
+export interface UploadError {
+  success: false;
+  retryCount: number;
+  error: string;
+  isNetworkError: boolean;
+}
+
+api.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const config = error.config;
+    
+    if (!config) return Promise.reject(error);
+    
+    // Skip retry if _skipRetry flag is set (e.g., for health checks)
+    if (config._skipRetry) return Promise.reject(error);
+    
+    // Per-request retry count tracking (avoids race condition with concurrent requests)
+    config._retryCount = (config._retryCount || 0) + 1;
+    
+    if (config._retryCount > MAX_RETRIES) {
+      config._retryCount = 0;
+      return Promise.reject(error);
+    }
+    
+    // Only retry on network errors or 5xx server errors
+    const isNetworkError = !error.response;
+    const isServerError = error.response?.status >= 500;
+    
+    if (isNetworkError || isServerError) {
+      // Calculate delay: 1s, 2s, 4s (exponential backoff)
+      const delay = Math.pow(2, config._retryCount - 1) * 1000;
+      
+      console.log(`[API] Retry ${config._retryCount}/${MAX_RETRIES} after ${delay}ms`);
+      
+      return new Promise((resolve) => {
+        setTimeout(() => resolve(api(config)), delay);
+      });
+    }
+    
+    return Promise.reject(error);
+  }
+);
 
 /// 胶囊状态类型定义
 export type CapsuleStatus = 'draft' | 'pending' | 'archived' | 'favorited' | 'echoing';
@@ -43,7 +111,7 @@ export interface BaseStatus {
   status: string;                         // 基地状态
 }
 
-/// 创建胶囊参数
+/// 创建胶囊参数 (backward compatible)
 export interface CreateCapsuleParams {
   type: 'text' | 'image' | 'audio';
   content?: string;
@@ -69,24 +137,98 @@ export const fetchCapsules = async (params?: {
 /// 获取基地状态
 /// 返回：BaseStatus 基地状态对象
 export const fetchStatus = async (): Promise<BaseStatus> => {
-  const res = await api.get('/status');
-  return res.data.data;
+  try {
+    const res = await api.get('/status');
+    return res.data.data;
+  } catch (error: any) {
+    // Provide actionable error message
+    if (error.code === 'ECONNABORTED' || !error.response) {
+      throw new Error('无法连接基地服务，请确保后端正在运行');
+    }
+    throw error;
+  }
 };
 
-/// 创建新胶囊
+/// 创建新胶囊 - 支持进度跟踪和重试
 /// 数据流：FormData → POST /api/capsules → 存储文件 → 返回新胶囊 ID
-export const createCapsule = async (params: CreateCapsuleParams): Promise<{ id: number; message: string }> => {
-  const formData = new FormData();
-  formData.append('type', params.type);
-  if (params.content) formData.append('content', params.content);
-  if (params.timestamp) formData.append('timestamp', params.timestamp.toString());
-  if (params.status) formData.append('status', params.status);
-  if (params.file) formData.append('file', params.file);
+export const createCapsule = async (
+  params: CreateCapsuleOptions
+): Promise<CreateCapsuleResult> => {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    let retryCount = 0;
 
-  const res = await api.post('/capsules', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
+    const attemptUpload = () => {
+      const formData = new FormData();
+      formData.append('type', params.type);
+      if (params.content) formData.append('content', params.content);
+      if (params.timestamp) formData.append('timestamp', params.timestamp.toString());
+      if (params.status) formData.append('status', params.status);
+      if (params.file) formData.append('file', params.file);
+
+      // Progress tracking
+      xhr.upload.addEventListener('progress', (e) => {
+        if (e.lengthComputable && params.onUploadProgress) {
+          params.onUploadProgress((e.loaded / e.total) * 100);
+        }
+      });
+
+      xhr.addEventListener('load', () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try {
+            const response = JSON.parse(xhr.responseText);
+            resolve(response.data);
+          } catch {
+            reject({ success: false, retryCount, error: 'Invalid response format', isNetworkError: false });
+          }
+        } else if (xhr.status >= 500 && retryCount < MAX_UPLOAD_RETRIES) {
+          // Server error - retry with backoff
+          retryCount++;
+          const delay = Math.pow(2, retryCount - 1) * 1000;
+          console.log(`[API] Upload retry ${retryCount}/${MAX_UPLOAD_RETRIES} after ${delay}ms (server error ${xhr.status})`);
+          if (params.onUploadProgress) params.onUploadProgress(-1); // Indicate retry
+          setTimeout(attemptUpload, delay);
+        } else {
+          reject({ success: false, retryCount, error: `Upload failed: ${xhr.status}`, isNetworkError: false });
+        }
+      });
+
+      xhr.addEventListener('error', () => {
+        if (retryCount < MAX_UPLOAD_RETRIES) {
+          // Network error - retry with backoff
+          retryCount++;
+          const delay = Math.pow(2, retryCount - 1) * 1000;
+          console.log(`[API] Upload retry ${retryCount}/${MAX_UPLOAD_RETRIES} after ${delay}ms (network error)`);
+          if (params.onUploadProgress) params.onUploadProgress(-1); // Indicate retry
+          setTimeout(attemptUpload, delay);
+        } else {
+          reject({ success: false, retryCount, error: 'Network error', isNetworkError: true });
+        }
+      });
+
+      xhr.addEventListener('abort', () => {
+        reject({ success: false, retryCount, error: 'Upload aborted', isNetworkError: false });
+      });
+
+      xhr.addEventListener('timeout', () => {
+        if (retryCount < MAX_UPLOAD_RETRIES) {
+          retryCount++;
+          const delay = Math.pow(2, retryCount - 1) * 1000;
+          console.log(`[API] Upload retry ${retryCount}/${MAX_UPLOAD_RETRIES} after ${delay}ms (timeout)`);
+          if (params.onUploadProgress) params.onUploadProgress(-1);
+          setTimeout(attemptUpload, delay);
+        } else {
+          reject({ success: false, retryCount, error: 'Request timeout', isNetworkError: true });
+        }
+      });
+
+      xhr.open('POST', '/api/capsules');
+      xhr.timeout = 30000; // 30 second timeout
+      xhr.send(formData);
+    };
+
+    attemptUpload();
   });
-  return res.data.data;
 };
 
 /// 更新胶囊 - 修改内容、状态、备注
@@ -111,9 +253,30 @@ export const restoreCapsule = async (id: number): Promise<{ id: number }> => {
   return res.data.data;
 };
 
+/// 清空回收站 - 永久删除所有软删除的胶囊
+export const emptyTrash = async (): Promise<{ deleted: number }> => {
+  const res = await api.delete('/capsules/trash');
+  return res.data.data;
+};
+
+/// 永久删除胶囊 - 直接从数据库删除
+export const permanentDeleteCapsule = async (id: number): Promise<{ id: number }> => {
+  const res = await api.delete(`/capsules/${id}/permanent`);
+  return res.data.data;
+};
+
 /// 重新投放胶囊（回响池功能）- 创建克隆，原胶囊保留
 export const recaptureCapsule = async (id: number, sourceId?: number): Promise<{ id: number; message: string }> => {
   const res = await api.post(`/capsules/${id}/recapture`, { sourceId });
+  return res.data.data;
+};
+
+/// 整理胶囊 - archive/wall/echo/delete 操作
+export const organizeCapsule = async (
+  id: number,
+  action: 'archive' | 'wall' | 'echo' | 'delete'
+): Promise<Capsule> => {
+  const res = await api.put(`/capsules/${id}/organize`, { action });
   return res.data.data;
 };
 
@@ -131,6 +294,7 @@ export interface Todo {
   updatedAt?: number;
   syncedAt?: number;                     // 最后同步时间
   calendarEventId?: string;              // 日历事件 ID
+  importance?: number;                   // 重要性等级 1-5 星
 }
 
 /// 同步结果
@@ -156,6 +320,7 @@ export const createTodo = async (data: {
   description?: string;
   dueDate?: number;
   localId?: string;
+  importance?: number;
 }): Promise<{ id: number; localId: string; createdAt: number; message: string }> => {
   const res = await api.post('/todos', data);
   return res.data.data;
@@ -168,6 +333,7 @@ export const updateTodo = async (id: number, data: {
   dueDate?: number;
   completed?: boolean;
   calendarEventId?: string;
+  importance?: number;
 }): Promise<{ id: number; updatedAt: number }> => {
   const res = await api.put(`/todos/${id}`, data);
   return res.data.data;
@@ -184,4 +350,17 @@ export const deleteTodo = async (id: number): Promise<{ id: number }> => {
 export const syncTodos = async (todos: Partial<Todo>[]): Promise<{ results: SyncResult[]; syncedAt: number }> => {
   const res = await api.post('/todos/sync', { todos });
   return res.data.data;
+};
+
+/**
+ * 健康检查 - 检测后端是否可达
+ * @returns Promise<boolean> true if backend is reachable
+ */
+export const healthCheck = async (): Promise<boolean> => {
+  try {
+    const res = await api.get('/health', { timeout: 3000, _skipRetry: true } as any);
+    return res.data?.data?.status === 'ok';
+  } catch {
+    return false;
+  }
 };
