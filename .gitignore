@@ -3,17 +3,18 @@
 # ===========================
 
 # Dependencies
-web-base/node_modules/
-web-base/dist/
-web-base/dist-ssr/
+**/node_modules/
 
 # Build outputs
+**/dist/
+**/dist-ssr/
 android-terminal/.gradle/
 android-terminal/build/
 android-terminal/app/build/
 
-# Exception: Include debug APK for GitHub release
-!android-terminal/app/build/outputs/apk/debug/*.apk
+# Compiled Android packages
+*.apk
+*.aab
 
 # IDE
 .idea/
@@ -44,6 +45,7 @@ _cleanup_candidates/
 *.temp
 *.swp
 *~
+
 # local for dev
 AGENTS.md
 tempdocs/

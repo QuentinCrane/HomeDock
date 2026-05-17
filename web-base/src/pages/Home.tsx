@@ -1157,7 +1157,7 @@ const HomePage: React.FC = () => {
                         style={{
                           backgroundColor: 'var(--color-base-panel-raised)',
                           border: '1px solid var(--color-base-border)',
-                          minHeight: '100px',
+                          minHeight: '140px',
                           flexBasis: 'calc(50% - 6px)',
                           flexGrow: 1
                         }}

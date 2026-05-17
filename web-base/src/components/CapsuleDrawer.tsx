@@ -22,7 +22,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Trash2, RotateCcw, Archive, Heart, Edit3, Check, FileText, Radio } from 'lucide-react';
+import { Icons } from './SVGs';
 import type { Capsule, CapsuleStatus } from '../api';
 import { updateCapsule, deleteCapsule, restoreCapsule } from '../api';
 import dayjs from 'dayjs';
@@ -152,7 +152,7 @@ const CapsuleDrawer: React.FC<CapsuleDrawerProps> = ({ capsule, isOpen, onClose,
               onClick={onClose}
               className="w-8 h-8 flex items-center justify-center text-[var(--color-base-text)] hover:text-[var(--color-base-text-bright)] hover:bg-[var(--color-base-border)] transition-colors rounded-lg"
             >
-              <X size={18} />
+              <Icons.X size={18} />
             </button>
             <div className="flex items-center gap-3 absolute left-1/2 -translate-x-1/2">
               <span className={`px-2 py-0.5 text-[10px] font-mono uppercase ${getStatusStyle(capsule.status).color} ${getStatusStyle(capsule.status).bgColor}`}>
@@ -288,7 +288,7 @@ const CapsuleDrawer: React.FC<CapsuleDrawerProps> = ({ capsule, isOpen, onClose,
                       onClick={() => handleStatusChange('pending')}
                       className="px-3 py-1.5 text-[10px] font-mono bg-blue-400/10 text-blue-400 hover:bg-blue-400/20 transition-colors flex items-center gap-1"
                     >
-                      <FileText size={12} /> 待整理
+                      <Icons.FileText size={12} /> 待整理
                     </button>
                   )}
                   <button
@@ -299,7 +299,7 @@ const CapsuleDrawer: React.FC<CapsuleDrawerProps> = ({ capsule, isOpen, onClose,
                         : 'bg-[var(--color-base-border)] text-[var(--color-base-text)] hover:bg-[var(--color-base-border-highlight)] hover:text-[var(--color-base-text-bright)]'
                     }`}
                   >
-                    <Heart size={12} fill={capsule.status === 'favorited' ? 'currentColor' : 'none'} />
+                    <Icons.Heart size={12} fill={capsule.status === 'favorited'} />
                     {capsule.status === 'favorited' ? '已收藏' : '收藏'}
                   </button>
                   {capsule.status !== 'archived' && (
@@ -307,7 +307,7 @@ const CapsuleDrawer: React.FC<CapsuleDrawerProps> = ({ capsule, isOpen, onClose,
                       onClick={() => handleStatusChange('archived')}
                       className="px-3 py-1.5 text-[10px] font-mono bg-slate-400/10 text-slate-400 hover:bg-slate-400/20 transition-colors flex items-center gap-1"
                     >
-                      <Archive size={12} /> 归档
+                      <Icons.Archive size={12} /> 归档
                     </button>
                   )}
                   {capsule.status !== 'draft' && (
@@ -315,7 +315,7 @@ const CapsuleDrawer: React.FC<CapsuleDrawerProps> = ({ capsule, isOpen, onClose,
                       onClick={() => handleStatusChange('draft')}
                       className="px-3 py-1.5 text-[10px] font-mono bg-amber-400/10 text-amber-400 hover:bg-amber-400/20 transition-colors flex items-center gap-1"
                     >
-                      <FileText size={12} /> 草稿
+                      <Icons.FileText size={12} /> 草稿
                     </button>
                   )}
                   {capsule.status !== 'echoing' && (
@@ -323,7 +323,7 @@ const CapsuleDrawer: React.FC<CapsuleDrawerProps> = ({ capsule, isOpen, onClose,
                       onClick={() => handleStatusChange('echoing')}
                       className="px-3 py-1.5 text-[10px] font-mono bg-purple-400/10 text-purple-400 hover:bg-purple-400/20 transition-colors flex items-center gap-1"
                     >
-                      <Radio size={12} /> 回响中
+                      <Icons.Radio size={12} /> 回响中
                     </button>
                   )}
                 </div>
@@ -335,7 +335,7 @@ const CapsuleDrawer: React.FC<CapsuleDrawerProps> = ({ capsule, isOpen, onClose,
                   onClick={handleRestore}
                   className="w-full py-2.5 flex items-center justify-center gap-2 bg-[var(--color-base-accent)] text-[var(--color-base-bg)] font-mono text-xs tracking-widest transition-colors"
                 >
-                  <RotateCcw size={14} /> 恢复
+                  <Icons.RotateCcw size={14} /> 恢复
                 </button>
               ) : (
                 <div className="flex gap-2">
@@ -352,7 +352,7 @@ const CapsuleDrawer: React.FC<CapsuleDrawerProps> = ({ capsule, isOpen, onClose,
                         disabled={isSaving}
                         className="flex-1 py-2.5 flex items-center justify-center gap-2 bg-[var(--color-base-success)] text-[var(--color-base-bg)] font-mono text-xs tracking-widest transition-colors disabled:opacity-50"
                       >
-                        <Check size={14} /> {isSaving ? '保存中...' : '保存'}
+                        <Icons.Check size={14} /> {isSaving ? '保存中...' : '保存'}
                       </button>
                     </>
                   ) : (
@@ -360,7 +360,7 @@ const CapsuleDrawer: React.FC<CapsuleDrawerProps> = ({ capsule, isOpen, onClose,
                       onClick={() => setIsEditing(true)}
                       className="flex-1 py-2.5 flex items-center justify-center gap-2 bg-[var(--color-base-border)] hover:bg-[var(--color-base-border-highlight)] text-[var(--color-base-text-bright)] font-mono text-xs tracking-widest transition-colors"
                     >
-                      <Edit3 size={14} /> 编辑
+                      <Icons.Edit3 size={14} /> 编辑
                     </button>
                   )}
                 </div>
@@ -373,7 +373,7 @@ const CapsuleDrawer: React.FC<CapsuleDrawerProps> = ({ capsule, isOpen, onClose,
                   disabled={isDeleting}
                   className="w-full py-2 flex items-center justify-center gap-2 text-[var(--color-base-text)] hover:text-red-400 font-mono text-xs tracking-widest transition-colors disabled:opacity-50"
                 >
-                  <Trash2 size={14} /> {isDeleting ? '删除中...' : '删除'}
+                  <Icons.Trash size={14} /> {isDeleting ? '删除中...' : '删除'}
                 </button>
               )}
             </div>
@@ -391,10 +391,10 @@ const CapsuleDrawer: React.FC<CapsuleDrawerProps> = ({ capsule, isOpen, onClose,
                 >
                   {/* Close button */}
                   <button
-                    onClick={() => setImageFullscreen(false)}
+                    onClick={(e) => { e.stopPropagation(); setImageFullscreen(false); }}
                     className="absolute top-4 right-4 z-[110] w-10 h-10 rounded-full bg-white/10 backdrop-blur-md text-white flex items-center justify-center hover:bg-white/20 transition-colors"
                   >
-                    <X size={18} />
+                    <Icons.X size={18} />
                   </button>
 
                   {/* Image container with frosted glass effect around edges */}
@@ -450,10 +450,10 @@ const CapsuleDrawer: React.FC<CapsuleDrawerProps> = ({ capsule, isOpen, onClose,
                 >
                   {/* Close button */}
                   <button
-                    onClick={() => setTextFullscreen(false)}
+                    onClick={(e) => { e.stopPropagation(); setTextFullscreen(false); }}
                     className="absolute top-4 right-4 z-[110] w-10 h-10 rounded-full bg-white/10 backdrop-blur-md text-white flex items-center justify-center hover:bg-white/20 transition-colors"
                   >
-                    <X size={18} />
+                    <Icons.X size={18} />
                   </button>
 
                   {/* Text container with frosted glass effect */}

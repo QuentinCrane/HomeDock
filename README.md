@@ -280,6 +280,8 @@ Before you start, make sure you have the following installed:
 
 ### For the full loop
 
+> ⚠️ **Important**: Return-to-Dock (sync) only works when the computer and Android phone are on the **same local network (LAN/Wi-Fi)**. The phone cannot sync with the base over the internet or from a different network.
+
 - A computer and Android phone on the **same LAN / Wi-Fi**
 - (Optional for NSD) A non-emulator Android device — emulators cannot receive mDNS broadcasts from the host machine
 

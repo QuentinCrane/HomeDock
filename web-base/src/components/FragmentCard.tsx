@@ -15,9 +15,9 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Trash2, FileText, Image, Mic, Layers } from 'lucide-react';
 import dayjs from 'dayjs';
 import type { Capsule, CapsuleStatus } from '../api';
+import { TypeIcon } from './SVGs';
 
 interface FragmentCardProps {
   capsule: Capsule;
@@ -36,15 +36,6 @@ const statusConfig: Record<string, { label: string; color: string; bgColor: stri
 
 const getStatusStyle = (status: CapsuleStatus | undefined) => {
   return statusConfig[status || 'pending'] || statusConfig.pending;
-};
-
-const TypeIcon = ({ type }: { type: string }) => {
-  switch (type) {
-    case 'text': return <FileText size={12} />;
-    case 'image': return <Image size={12} />;
-    case 'audio': return <Mic size={12} />;
-    default: return <Layers size={12} />;
-  }
 };
 
 // Deterministic pseudo-random based on capsule ID (no Math.random)
@@ -116,7 +107,9 @@ export const FragmentCard: React.FC<FragmentCardProps> = ({
               }}
               className="p-1.5 rounded-lg bg-[var(--color-base-bg)]/80 backdrop-blur-sm border border-[var(--color-base-border)] text-[var(--color-base-text)] hover:text-red-400 hover:border-red-400/50 transition-all opacity-0 group-hover:opacity-100"
             >
-              <Trash2 size={10} />
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                <path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14z" />
+              </svg>
             </button>
           )}
         </div>
@@ -131,7 +124,7 @@ export const FragmentCard: React.FC<FragmentCardProps> = ({
               capsule.type === 'image' ? '#fbbf24' :
               '#34d399'
           }}>
-          <TypeIcon type={capsule.type} />
+          <TypeIcon type={capsule.type} size={12} />
         </div>
 
         {/* 内容区域 */}

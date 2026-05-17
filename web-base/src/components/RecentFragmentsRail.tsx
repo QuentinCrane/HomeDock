@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Clock, ChevronRight, Inbox, Image, Mic, FileText } from 'lucide-react';
+import { Icons } from './SVGs';
 import dayjs from 'dayjs';
 import type { Capsule } from '../api';
 
@@ -13,10 +13,10 @@ interface RecentFragmentsRailProps {
 // === Helpers ===
 const getTypeIcon = (type: string, size = 12) => {
   switch (type) {
-    case 'text': return <FileText size={size} />;
-    case 'image': return <Image size={size} />;
-    case 'audio': return <Mic size={size} />;
-    default: return <FileText size={size} />;
+    case 'text': return <Icons.FileText size={size} />;
+    case 'image': return <Icons.Image size={size} />;
+    case 'audio': return <Icons.Mic size={size} />;
+    default: return <Icons.FileText size={size} />;
   }
 };
 
@@ -49,7 +49,7 @@ export const RecentFragmentsRail: React.FC<RecentFragmentsRailProps> = ({
           animate={{ opacity: [0.8, 1, 0.8] }}
           transition={{ duration: 4, repeat: Infinity }}
         >
-          <Clock size={13} className="text-[var(--color-base-accent)]" />
+          <Icons.Clock size={13} className="text-[var(--color-base-accent)]" />
           <span className="text-xs font-mono tracking-wider text-[var(--color-base-text-bright)]">
             最近碎片
           </span>
@@ -59,7 +59,7 @@ export const RecentFragmentsRail: React.FC<RecentFragmentsRailProps> = ({
           className="text-[10px] font-mono text-[var(--color-base-text)] hover:text-[var(--color-base-accent)] transition-colors flex items-center gap-1"
           whileHover={{ y: -2 }}
         >
-          查看全部 <ChevronRight size={11} />
+          查看全部 <Icons.ChevronRight size={11} />
         </motion.button>
       </div>
 
@@ -87,7 +87,7 @@ export const RecentFragmentsRail: React.FC<RecentFragmentsRailProps> = ({
               animate={{ y: [0, -4, 0] }}
               transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
             >
-              <Inbox size={22} className="text-[var(--color-base-text)] opacity-30" />
+              <Icons.Inbox size={22} className="text-[var(--color-base-text)] opacity-30" />
             </motion.div>
             <p className="text-xs font-mono text-[var(--color-base-text)] opacity-40">暂无碎片</p>
           </motion.div>

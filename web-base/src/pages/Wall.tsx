@@ -23,9 +23,10 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { Capsule, CapsuleStatus } from '../api';
-import { fetchCapsules, deleteCapsule, organizeCapsule } from '../api';
+import { SwipeableCard } from '../components/SwipeableCard';
+import { fetchCapsules, deleteCapsule, organizeCapsule, updateCapsule } from '../api';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, Search, Grid, List, Trash2, AlertCircle, RefreshCw, FileText, Image, Mic, Layers, Plus, Home, Radio, Archive, Inbox, Repeat } from 'lucide-react';
+import { Icons } from '../components/SVGs';
 import dayjs from 'dayjs';
 import CapsuleDrawer from '../components/CapsuleDrawer';
 import { useCapsuleSync } from '../hooks/useSSE';
@@ -53,9 +54,9 @@ const getStatusStyle = (status: CapsuleStatus | undefined) => {
 
 /// 类型颜色配置 - 使用 CSS 变量适配日/夜间模式
 const typeColors = {
-  text: { bg: 'rgba(96, 165, 250, 0.15)', text: '#60a5fa', icon: FileText },
-  image: { bg: 'rgba(251, 191, 36, 0.15)', text: '#fbbf24', icon: Image },
-  audio: { bg: 'rgba(52, 211, 153, 0.15)', text: '#34d399', icon: Mic },
+  text: { bg: 'rgba(96, 165, 250, 0.15)', text: '#60a5fa', icon: Icons.FileText },
+  image: { bg: 'rgba(251, 191, 36, 0.15)', text: '#fbbf24', icon: Icons.Image },
+  audio: { bg: 'rgba(52, 211, 153, 0.15)', text: '#34d399', icon: Icons.Mic },
 };
 
 // Deterministic pseudo-random based on capsule ID (no Math.random)
@@ -129,17 +130,28 @@ const WallPage: React.FC = () => {
     }
   };
 
-  const handleOrganize = async (e: React.MouseEvent, capsule: Capsule, action: 'archive' | 'wall' | 'echo' | 'delete') => {
+  const handleOrganize = async (e: React.MouseEvent, capsule: Capsule, action: 'archive' | 'wall' | 'echo' | 'delete' | 'favorited') => {
     e.stopPropagation();
-    const actionLabels = { archive: '归档', wall: 'Wall', echo: '回响', delete: '删除' };
+    const actionLabels = { archive: '归档', wall: 'Wall', echo: '回响', delete: '删除', favorited: '收藏' };
     const confirmMessages = {
       archive: `确定要归档这个碎片吗？`,
       wall: `确定要将这个碎片标记为 Wall 吗？`,
       echo: `确定要将这个碎片发送到回响池吗？`,
-      delete: `确定要删除这个碎片吗？`
+      delete: `确定要删除这个碎片吗？`,
+      favorited: `确定要收藏这个碎片吗？`
     };
-    
-    if (confirm(confirmMessages[action])) {
+
+    if (action === 'favorited') {
+      // Favoriting uses updateCapsule directly
+      try {
+        await updateCapsule(capsule.id, { status: 'favorited' });
+        addToast(`已添加收藏`, 'success');
+        loadCapsules();
+      } catch (err) {
+        console.error(err);
+        addToast(`收藏失败`, 'error');
+      }
+    } else if (confirm(confirmMessages[action])) {
       try {
         await organizeCapsule(capsule.id, action);
         addToast(`${actionLabels[action]}成功`, 'success');
@@ -152,17 +164,21 @@ const WallPage: React.FC = () => {
   };
 
   const TypeIcon = ({ type, size = 12 }: { type: string; size?: number }) => {
-    const Icon = (typeColors as Record<string, typeof typeColors.text>)[type]?.icon || Layers;
+    const Icon = (typeColors as Record<string, typeof typeColors.text>)[type]?.icon || Icons.Layers;
     return <Icon size={size} />;
   };
 
-  // Empty state content - meaningful scaffold
+  // Empty state content - 砖墙结构插画，带浮动动画
   const EmptyState = () => (
     <div className="h-full flex flex-col items-center justify-center relative">
-      {/* Wall structure illustration */}
+      {/* 砖墙结构插画 - 保持独特的砖块图案感 */}
       <div className="relative w-full max-w-md px-8">
-        {/* Brick pattern to suggest wall structure */}
-        <div className="grid grid-cols-4 gap-2 mb-8 opacity-20">
+        {/* 砖块图案 - 添加 animate-float 浮动动画 */}
+        <motion.div
+          className="grid grid-cols-4 gap-2 mb-8 opacity-20"
+          animate={{ y: [0, -5, 0] }}
+          transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
+        >
           {Array.from({ length: 12 }).map((_, i) => (
             <motion.div
               key={i}
@@ -170,13 +186,13 @@ const WallPage: React.FC = () => {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: i * 0.05 }}
               className="h-8 rounded"
-              style={{ 
+              style={{
                 backgroundColor: 'var(--color-base-border)',
                 opacity: 0.3 + (i % 3) * 0.1
               }}
             />
           ))}
-        </div>
+        </motion.div>
 
         {/* Central message */}
         <div className="text-center space-y-4">
@@ -187,7 +203,7 @@ const WallPage: React.FC = () => {
             className="inline-flex items-center justify-center w-16 h-16 rounded-2xl"
             style={{ backgroundColor: 'var(--color-base-panel)' }}
           >
-            <Grid size={28} className="text-[var(--color-base-text)] opacity-30" />
+            <Icons.Grid size={28} className="text-[var(--color-base-text)] opacity-30" />
           </motion.div>
           
           <div>
@@ -217,7 +233,7 @@ const WallPage: React.FC = () => {
             whileHover={{ y: -2, scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
           >
-            <Plus size={12} />
+            <Icons.Plus size={12} />
             添加碎片
           </motion.button>
           
@@ -232,7 +248,7 @@ const WallPage: React.FC = () => {
             whileHover={{ y: -2 }}
             whileTap={{ scale: 0.98 }}
           >
-            <Home size={12} />
+            <Icons.Home size={12} />
             返回首页
           </motion.button>
         </motion.div>
@@ -246,7 +262,7 @@ const WallPage: React.FC = () => {
         >
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-[9px] font-mono"
                style={{ backgroundColor: 'var(--color-base-panel)', border: '1px solid var(--color-base-border)' }}>
-            <Radio size={9} className="text-[var(--color-base-accent)]" />
+            <Icons.Radio size={9} className="text-[var(--color-base-accent)]" />
             <span className="text-[var(--color-base-text)] opacity-50">
               Android 端回港后将自动同步
             </span>
@@ -268,7 +284,7 @@ const WallPage: React.FC = () => {
   );
 
   return (
-    <div className="w-full flex-1 min-h-0 flex flex-col relative" style={{ backgroundColor: 'var(--color-base-bg)' }}>
+    <div className="w-full flex-1 min-h-0 flex flex-col relative p-4 pt-2" style={{ backgroundColor: 'var(--color-base-bg)' }}>
       {/* Top Bar */}
       <div className="flex-shrink-0">
         <div className="flex items-center justify-between mb-4 pb-4 border-b border-[var(--color-base-border)]">
@@ -276,12 +292,12 @@ const WallPage: React.FC = () => {
             onClick={() => navigate('/')}
             className="flex items-center gap-2 text-[var(--color-base-text)] hover:text-[var(--color-base-accent)] transition-colors font-mono text-sm tracking-wider"
           >
-            <ArrowLeft size={16} className="hover:-translate-x-1 transition-transform" />
+            <Icons.ArrowLeft size={16} className="hover:-translate-x-1 transition-transform" />
             <span className="hidden sm:inline">返回基地</span>
           </button>
 
           <h2 className="text-lg font-bold text-[var(--color-base-text-bright)] tracking-[0.2em] flex items-center gap-2">
-            <Grid size={18} className="text-[var(--color-base-accent)]" />
+            <Icons.Grid size={18} className="text-[var(--color-base-accent)]" />
             碎片墙
           </h2>
 
@@ -300,34 +316,42 @@ const WallPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Filter & Search Bar */}
+        {/* Filter & Search Bar - 分段筛选控件设计 */}
         <div className="flex flex-wrap items-center gap-3 mb-3">
-          {/* Type filter chips */}
-          <div className="flex rounded-lg p-1 gap-0.5" style={{ backgroundColor: 'var(--color-base-panel)', border: '1px solid var(--color-base-border)' }}>
+          {/* 类型筛选 - 分段控件，iOS 风格滑动指示器 */}
+          <div className="relative flex rounded-lg p-0.5 gap-0.5 overflow-hidden" style={{ backgroundColor: 'var(--color-base-panel)', border: '1px solid var(--color-base-border)' }}>
             {([
-              { key: 'all' as FilterType, label: '全部', icon: <Layers size={11} /> },
-              { key: 'text' as FilterType, label: '文字', icon: <FileText size={11} /> },
-              { key: 'image' as FilterType, label: '图片', icon: <Image size={11} /> },
-              { key: 'audio' as FilterType, label: '音频', icon: <Mic size={11} /> },
+              { key: 'all' as FilterType, label: '全部', icon: <Icons.Layers size={11} /> },
+              { key: 'text' as FilterType, label: '文字', icon: <Icons.FileText size={11} /> },
+              { key: 'image' as FilterType, label: '图片', icon: <Icons.Image size={11} /> },
+              { key: 'audio' as FilterType, label: '音频', icon: <Icons.Mic size={11} /> },
             ] as { key: FilterType; label: string; icon: React.ReactNode }[]).map(f => (
               <button
                 key={f.key}
                 onClick={() => setFilterType(f.key)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-mono tracking-wider transition-all rounded-md ${
+                className={`relative z-10 flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-mono tracking-wider transition-all rounded-md card-interactive ${
                   filterType === f.key
                     ? 'text-[var(--color-base-bg)]'
-                    : 'text-[var(--color-base-text)] hover:bg-[var(--color-base-border)]'
+                    : 'text-[var(--color-base-text)]'
                 }`}
-                style={filterType === f.key ? { backgroundColor: 'var(--color-base-accent)' } : {}}
               >
+                {/* 滑动指示器 - 放在每个按钮内部，通过 layoutId 实现平滑动画 */}
+                {filterType === f.key && (
+                  <motion.div
+                    className="absolute inset-0 rounded-md -z-10"
+                    style={{ backgroundColor: 'var(--color-base-accent)' }}
+                    layoutId="wall-type-indicator"
+                    transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                  />
+                )}
                 {f.icon}
                 <span>{f.label}</span>
               </button>
             ))}
           </div>
 
-          {/* Status filter chips */}
-          <div className="flex rounded-lg p-1 gap-0.5" style={{ backgroundColor: 'var(--color-base-panel)', border: '1px solid var(--color-base-border)' }}>
+          {/* 状态筛选 - 分段控件 */}
+          <div className="relative flex rounded-lg p-0.5 gap-0.5 overflow-hidden" style={{ backgroundColor: 'var(--color-base-panel)', border: '1px solid var(--color-base-border)' }}>
             {([
               { key: 'all' as StatusFilter, label: '全部' },
               { key: 'draft' as StatusFilter, label: '草稿' },
@@ -338,13 +362,21 @@ const WallPage: React.FC = () => {
               <button
                 key={f.key}
                 onClick={() => setFilterStatus(f.key)}
-                className={`px-2.5 py-1.5 text-[10px] font-mono tracking-wider transition-all rounded-md ${
+                className={`relative z-10 px-2.5 py-1.5 text-[10px] font-mono tracking-wider transition-all rounded-md card-interactive ${
                   filterStatus === f.key
                     ? 'text-[var(--color-base-bg)]'
-                    : 'text-[var(--color-base-text)] hover:bg-[var(--color-base-border)]'
+                    : 'text-[var(--color-base-text)]'
                 }`}
-                style={filterStatus === f.key ? { backgroundColor: 'var(--color-base-accent)' } : {}}
               >
+                {/* 滑动指示器 - 放在每个按钮内部，通过 layoutId 实现平滑动画 */}
+                {filterStatus === f.key && (
+                  <motion.div
+                    className="absolute inset-0 rounded-md -z-10"
+                    style={{ backgroundColor: 'var(--color-base-accent)' }}
+                    layoutId="wall-status-indicator"
+                    transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                  />
+                )}
                 {f.label}
               </button>
             ))}
@@ -352,7 +384,7 @@ const WallPage: React.FC = () => {
 
           {/* Search */}
           <div className="relative flex-1 max-w-[180px]">
-            <Search size={11} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--color-base-text)] opacity-50" />
+            <Icons.Search size={11} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--color-base-text)] opacity-50" />
             <input
               type="text"
               value={searchQuery}
@@ -374,7 +406,7 @@ const WallPage: React.FC = () => {
               style={viewMode === 'masonry' ? { backgroundColor: 'var(--color-base-accent)' } : {}}
               title="瀑布流"
             >
-              <Grid size={13} />
+              <Icons.Grid size={13} />
             </button>
             <button
               onClick={() => setViewMode('grid')}
@@ -382,7 +414,7 @@ const WallPage: React.FC = () => {
               style={viewMode === 'grid' ? { backgroundColor: 'var(--color-base-accent)' } : {}}
               title="列表"
             >
-              <List size={13} />
+              <Icons.List size={13} />
             </button>
 
           </div>
@@ -407,18 +439,18 @@ const WallPage: React.FC = () => {
             style={{ backgroundColor: 'rgba(139, 74, 74, 0.2)', border: '1px solid rgba(139, 74, 74, 0.4)' }}
           >
             <div className="flex items-center gap-2" style={{ color: 'var(--color-base-error)' }}>
-              <AlertCircle size={14} />
+              <Icons.AlertCircle size={14} />
               <span className="text-xs font-mono">{error}</span>
             </div>
             <button onClick={loadCapsules} className="text-[10px] font-mono flex items-center gap-1 hover:underline" style={{ color: 'var(--color-base-error)' }}>
-              <RefreshCw size={10} /> 重试
+              <Icons.RefreshCw size={10} /> 重试
             </button>
           </motion.div>
         )}
       </AnimatePresence>
 
       {/* Content Wall - Real Masonry Grid */}
-      <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar pb-10" style={{ backgroundColor: 'var(--color-base-bg)' }}>
+      <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar pb-10 pt-2" style={{ backgroundColor: 'var(--color-base-bg)' }}>
         {loading ? (
           <div className="h-full flex items-center justify-center">
             <motion.div
@@ -446,25 +478,30 @@ const WallPage: React.FC = () => {
                   key={cap.id}
                   initial={{ opacity: 0, y: 30, scale: 0.95 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
-                  transition={{ 
+                  transition={{
                     delay: Math.min(idx * 0.03, 0.4),
                     type: 'spring',
                     stiffness: 260,
                     damping: 25
                   }}
-                  whileHover={{ y: -4, boxShadow: '0 12px 40px rgba(0,0,0,0.4)' }}
                   whileTap={{ scale: 0.98 }}
-                  className="break-inside-avoid relative cursor-pointer"
+                  className="break-inside-avoid relative"
                   layout
                 >
-                  <div
-                    onClick={() => handleCapsuleClick(cap)}
-                    className="rounded-xl overflow-hidden group"
-                    style={{ 
-                      backgroundColor: 'var(--color-base-panel)',
-                      border: '1px solid var(--color-base-border)'
-                    }}
+                  <SwipeableCard
+                    enabled={filterStatus === 'pending' && !isDeleted}
+                    onSwipeLeft={() => handleOrganize({ stopPropagation: () => {} } as any, cap, 'archive')}
+                    onSwipeRight={() => handleOrganize({ stopPropagation: () => {} } as any, cap, 'favorited')}
+                    leftLabel="归档"
                   >
+                    <div
+                      onClick={() => handleCapsuleClick(cap)}
+                      className="rounded-xl overflow-hidden group"
+                      style={{
+                        backgroundColor: 'var(--color-base-panel)',
+                        border: '1px solid var(--color-base-border)'
+                      }}
+                    >
                     {/* Subtle paper texture */}
                     <div className="absolute inset-0 opacity-[0.02] pointer-events-none"
                       style={{
@@ -501,7 +538,7 @@ const WallPage: React.FC = () => {
                     </div>
 
                     {/* Content */}
-                    <div className="p-4 pt-16">
+                    <div className="p-4 pt-2">
                       {/* Text content */}
                       {cap.type === 'text' && (
                         <p className="text-[13px] text-[var(--color-base-text-light)] font-sans leading-relaxed whitespace-pre-wrap">
@@ -590,7 +627,7 @@ const WallPage: React.FC = () => {
                               }}
                               title="归档"
                             >
-                              <Archive size={10} />
+                              <Icons.Archive size={10} />
                             </motion.button>
                             <motion.button
                               initial={{ opacity: 0, scale: 0.8 }}
@@ -604,7 +641,7 @@ const WallPage: React.FC = () => {
                               }}
                               title="Wall"
                             >
-                              <Inbox size={10} />
+                              <Icons.Inbox size={10} />
                             </motion.button>
                             <motion.button
                               initial={{ opacity: 0, scale: 0.8 }}
@@ -618,7 +655,7 @@ const WallPage: React.FC = () => {
                               }}
                               title="回响"
                             >
-                              <Repeat size={10} />
+                              <Icons.Repeat size={10} />
                             </motion.button>
                             <motion.button
                               initial={{ opacity: 0, scale: 0.8 }}
@@ -632,7 +669,7 @@ const WallPage: React.FC = () => {
                               }}
                               title="删除"
                             >
-                              <Trash2 size={10} />
+                              <Icons.Trash size={10} />
                             </motion.button>
                           </>
                         ) : (
@@ -642,17 +679,18 @@ const WallPage: React.FC = () => {
                             whileHover={{ scale: 1.05 }}
                             onClick={(e) => handleQuickDelete(e, cap)}
                             className="p-1.5 rounded-lg text-[var(--color-base-text)] hover:text-red-400 transition-all opacity-0 group-hover:opacity-100"
-                            style={{ 
+                            style={{
                               backgroundColor: 'var(--color-base-bg)',
                               border: '1px solid var(--color-base-border)'
                             }}
                           >
-                            <Trash2 size={10} />
+                            <Icons.Trash size={10} />
                           </motion.button>
                         )}
                       </div>
                     )}
                   </div>
+                  </SwipeableCard>
                 </motion.div>
               );
             })}
@@ -709,7 +747,7 @@ const WallPage: React.FC = () => {
                               style={{ color: 'var(--color-base-text)' }}
                               title="归档"
                             >
-                              <Archive size={12} />
+                              <Icons.Archive size={12} />
                             </button>
                             <button
                               onClick={(e) => handleOrganize(e, cap, 'wall')}
@@ -717,7 +755,7 @@ const WallPage: React.FC = () => {
                               style={{ color: 'var(--color-base-accent)' }}
                               title="Wall"
                             >
-                              <Inbox size={12} />
+                              <Icons.Inbox size={12} />
                             </button>
                             <button
                               onClick={(e) => handleOrganize(e, cap, 'echo')}
@@ -725,7 +763,7 @@ const WallPage: React.FC = () => {
                               style={{ color: '#a78bfa' }}
                               title="回响"
                             >
-                              <Repeat size={12} />
+                              <Icons.Repeat size={12} />
                             </button>
                             <button
                               onClick={(e) => handleOrganize(e, cap, 'delete')}
@@ -733,7 +771,7 @@ const WallPage: React.FC = () => {
                               style={{ color: 'var(--color-base-text)' }}
                               title="删除"
                             >
-                              <Trash2 size={12} />
+                              <Icons.Trash size={12} />
                             </button>
                           </>
                         ) : (
@@ -741,7 +779,7 @@ const WallPage: React.FC = () => {
                             onClick={(e) => handleQuickDelete(e, cap)}
                             className="p-1.5 text-[var(--color-base-text)] hover:text-red-400 transition-colors"
                           >
-                            <Trash2 size={12} />
+                            <Icons.Trash size={12} />
                           </button>
                         )}
                       </div>

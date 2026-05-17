@@ -30,25 +30,7 @@ import { useNavigate } from 'react-router-dom';
 import type { Todo } from '../api';
 import { fetchTodos, createTodo, updateTodo, deleteTodo } from '../api';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  ArrowLeft, 
-  Plus, 
-  Check, 
-  X, 
-  Trash2, 
-  Edit3, 
-  Calendar,
-  ChevronRight,
-  CheckCircle2,
-  Circle,
-  AlertCircle,
-  Link2,
-  Star,
-  List,
-  Grid3X3,
-  ChevronLeft,
-  ChevronDown
-} from 'lucide-react';
+import { Icons } from '../components/SVGs';
 import dayjs from 'dayjs';
 import { useTodoSync } from '../hooks/useSSE';
 
@@ -62,7 +44,7 @@ type ViewMode = 'list' | 'calendar';
 const ImportanceStars: React.FC<{ importance: number; size?: number }> = ({ importance, size = 12 }) => (
   <div className="flex items-center gap-0.5">
     {[1, 2, 3, 4, 5].map((star) => (
-      <Star
+      <Icons.Heart
         key={star}
         size={size}
         className={star <= importance 
@@ -87,7 +69,7 @@ const ImportanceSelector: React.FC<{
         onClick={() => onChange(star === value ? 0 : star)}
         className="p-0.5 transition-transform hover:scale-110"
       >
-        <Star
+        <Icons.Heart
           size={20}
           className={star <= value 
             ? 'text-yellow-500 fill-yellow-500' 
@@ -154,7 +136,7 @@ const CalendarView: React.FC<{
           onClick={() => onMonthChange('prev')}
           className="p-1.5 hover:bg-[var(--color-base-border)] transition-colors"
         >
-          <ChevronLeft size={16} className="text-[var(--color-base-text)]" />
+          <Icons.ArrowLeft size={16} className="text-[var(--color-base-text)]" />
         </button>
         <h3 className="text-sm font-mono text-[var(--color-base-text-bright)] tracking-widest">
           {year} 年 {month + 1} 月
@@ -163,7 +145,7 @@ const CalendarView: React.FC<{
           onClick={() => onMonthChange('next')}
           className="p-1.5 hover:bg-[var(--color-base-border)] transition-colors"
         >
-          <ChevronDown size={16} className="text-[var(--color-base-text)] rotate-90" />
+          <Icons.ArrowLeft size={16} className="text-[var(--color-base-text)] rotate-90" />
         </button>
       </div>
 
@@ -209,10 +191,24 @@ const CalendarView: React.FC<{
               `}
             >
               <span>{day}</span>
+              {/* 多点密度指示器 - 根据待办数量显示1-3个点 */}
               {count > 0 && (
-                <span className={`absolute bottom-0.5 w-1.5 h-1.5 rounded-full ${
-                  isSelected ? 'bg-[var(--color-base-bg)]' : 'bg-[var(--color-base-accent)]'
-                }`} />
+                <div className="absolute bottom-0.5 flex items-center gap-0.5">
+                  {count === 1 ? (
+                    <span className={`w-1 h-1 rounded-full ${isSelected ? 'bg-[var(--color-base-bg)]' : 'bg-[var(--color-base-accent)]'}`} />
+                  ) : count === 2 ? (
+                    <>
+                      <span className={`w-1 h-1 rounded-full ${isSelected ? 'bg-[var(--color-base-bg)]' : 'bg-[var(--color-base-accent)]'}`} />
+                      <span className={`w-1 h-1 rounded-full ${isSelected ? 'bg-[var(--color-base-bg)]' : 'bg-[var(--color-base-accent)]'}`} />
+                    </>
+                  ) : (
+                    <>
+                      <span className={`w-1 h-1 rounded-full ${isSelected ? 'bg-[var(--color-base-bg)]' : 'bg-[var(--color-base-accent)]'}`} />
+                      <span className={`w-1 h-1 rounded-full ${isSelected ? 'bg-[var(--color-base-bg)]' : 'bg-[var(--color-base-accent)]'}`} />
+                      <span className={`w-1 h-1 rounded-full ${isSelected ? 'bg-[var(--color-base-bg)]' : 'bg-[var(--color-base-accent)]'}`} />
+                    </>
+                  )}
+                </div>
               )}
             </button>
           );
@@ -257,7 +253,7 @@ const ErrorBanner: React.FC<{ message: string; onDismiss: () => void; onRetry?: 
     className="mb-4 p-3 bg-[var(--color-base-error)]/20 border border-[var(--color-base-error)]/40 flex items-center justify-between"
   >
     <div className="flex items-center gap-2 text-[var(--color-base-error)]">
-      <AlertCircle size={14} />
+      <Icons.AlertCircle size={14} />
       <span className="text-xs font-mono">{message}</span>
     </div>
     <div className="flex items-center gap-2">
@@ -270,7 +266,7 @@ const ErrorBanner: React.FC<{ message: string; onDismiss: () => void; onRetry?: 
         </button>
       )}
       <button onClick={onDismiss} className="text-[var(--color-base-error)] hover:opacity-70">
-        <X size={12} />
+        <Icons.X size={12} />
       </button>
     </div>
   </motion.div>
@@ -452,14 +448,14 @@ const TodosPage: React.FC = () => {
   const completedCount = todos.filter(t => t.completed).length;
 
   return (
-    <div className="w-full flex-1 min-h-0 flex flex-col relative max-w-6xl mx-auto">
+    <div className="w-full flex-1 min-h-0 flex flex-col relative max-w-6xl mx-auto pt-2">
       {/* 顶栏 */}
-      <div className="flex items-center justify-between mb-6 border-b border-[var(--color-base-border)] pb-4">
+      <div className="flex items-center justify-between mb-6 border-b border-[var(--color-base-border)] pb-4 p-4">
         <button
           onClick={() => navigate('/')}
           className="flex items-center gap-2 text-[var(--color-base-text)] hover:text-[var(--color-base-accent)] transition-colors font-mono text-sm tracking-widest uppercase group"
         >
-          <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" />
+          <Icons.ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" />
           [ 返回基地 ]
         </button>
 
@@ -478,7 +474,7 @@ const TodosPage: React.FC = () => {
               }`}
               title="列表视图"
             >
-              <List size={14} />
+              <Icons.List size={14} />
             </button>
             <button
               onClick={() => setViewMode('calendar')}
@@ -488,14 +484,14 @@ const TodosPage: React.FC = () => {
               }`}
               title="日历视图"
             >
-              <Grid3X3 size={14} />
+              <Icons.Layers size={14} />
             </button>
           </div>
           <button
             onClick={() => setShowCreateModal(true)}
             className="flex items-center gap-1 px-3 py-1.5 bg-[var(--color-base-accent)]/20 text-[var(--color-base-accent)] font-mono text-xs hover:bg-[var(--color-base-accent)]/30 transition-colors"
           >
-            <Plus size={14} />
+            <Icons.Plus size={14} />
             新建
           </button>
         </div>
@@ -522,7 +518,7 @@ const TodosPage: React.FC = () => {
                   : 'text-[var(--color-base-text)] hover:text-[var(--color-base-text-light)]'
               }`}
             >
-              <Circle size={12} />
+              <Icons.Circle size={12} />
               进行中
               <span className="ml-1 px-1.5 py-0.5 rounded bg-[var(--color-base-border)] text-[10px]">
                 {activeCount}
@@ -536,7 +532,7 @@ const TodosPage: React.FC = () => {
                   : 'text-[var(--color-base-text)] hover:text-[var(--color-base-text-light)]'
               }`}
             >
-              <CheckCircle2 size={12} />
+              <Icons.CheckCircle size={12} />
               已完成
               <span className="ml-1 px-1.5 py-0.5 rounded bg-[var(--color-base-border)] text-[10px]">
                 {completedCount}
@@ -549,9 +545,9 @@ const TodosPage: React.FC = () => {
                 onClick={() => setSelectedCalendarDate(null)}
                 className="ml-auto px-2 py-1 text-[10px] font-mono text-[var(--color-base-accent)] bg-[var(--color-base-accent)]/10 border border-[var(--color-base-accent)]/30 flex items-center gap-1 hover:bg-[var(--color-base-accent)]/20 transition-colors"
               >
-                <Calendar size={10} />
+                <Icons.Calendar size={10} />
                 {dayjs(selectedCalendarDate).format('MM-DD')}
-                <X size={10} />
+                <Icons.X size={10} />
               </button>
             )}
           </div>
@@ -605,7 +601,7 @@ const TodosPage: React.FC = () => {
                               : 'text-[var(--color-base-text)] hover:text-[var(--color-base-accent)]'
                           }`}
                         >
-                          {todo.completed ? <CheckCircle2 size={18} /> : <Circle size={18} />}
+                          {todo.completed ? <Icons.CheckCircle size={18} /> : <Icons.Circle size={18} />}
                         </button>
 
                         {/* 内容 */}
@@ -632,20 +628,20 @@ const TodosPage: React.FC = () => {
                                   ? 'text-[var(--color-base-error)]' 
                                   : 'text-[var(--color-base-text)] opacity-60'
                               }`}>
-                                <Calendar size={10} />
+                                <Icons.Calendar size={10} />
                                 {dayjs(todo.dueDate).format('MM-DD')}
                               </span>
                             )}
                             {todo.calendarEventId && (
                               <span className="text-[10px] font-mono text-[var(--color-base-accent)] opacity-60 flex items-center gap-1">
-                                <Link2 size={10} />
+                                <Icons.ExternalLink size={10} />
                                 已同步
                               </span>
                             )}
                           </div>
                         </div>
 
-                        <ChevronRight size={14} className="text-[var(--color-base-text)] opacity-30 mt-1" />
+                        <Icons.ChevronRight size={14} className="text-[var(--color-base-text)] opacity-30 mt-1" />
                       </div>
                     </motion.div>
                   ))}
@@ -743,7 +739,7 @@ const TodosPage: React.FC = () => {
                           : 'border-[var(--color-base-border)] bg-[var(--color-base-bg)]'
                       }`}>
                         <div className="flex items-center gap-2 text-[var(--color-base-text)]">
-                          <Calendar size={14} />
+                          <Icons.Calendar size={14} />
                           <span className="text-sm font-mono">
                             {dayjs(selectedTodo.dueDate).format('YYYY 年 MM 月 DD 日')}
                           </span>
@@ -787,13 +783,13 @@ const TodosPage: React.FC = () => {
                       onClick={() => setIsEditing(false)}
                       className="flex-1 py-2 flex items-center justify-center gap-1 bg-[var(--color-base-border)] text-[var(--color-base-text-bright)] font-mono text-xs transition-colors"
                     >
-                      <X size={12} /> 取消
+                      <Icons.X size={12} /> 取消
                     </button>
                     <button
                       onClick={handleSaveEdit}
                       className="flex-1 py-2 flex items-center justify-center gap-1 bg-[var(--color-base-success)] text-[var(--color-base-bg)] font-mono text-xs transition-colors"
                     >
-                      <Check size={12} /> 保存
+                      <Icons.Check size={12} /> 保存
                     </button>
                   </div>
                 ) : (
@@ -801,7 +797,7 @@ const TodosPage: React.FC = () => {
                     onClick={() => setIsEditing(true)}
                     className="w-full py-2 flex items-center justify-center gap-2 bg-[var(--color-base-border)] hover:bg-[var(--color-base-border-highlight)] text-[var(--color-base-text-bright)] font-mono text-xs tracking-widest transition-colors"
                   >
-                    <Edit3 size={14} /> 编辑
+                    <Icons.Edit3 size={14} /> 编辑
                   </button>
                 )}
 
@@ -811,7 +807,7 @@ const TodosPage: React.FC = () => {
                     onClick={() => handleCalendarLink(selectedTodo)}
                     className="w-full py-2 flex items-center justify-center gap-2 text-[var(--color-base-accent)] hover:text-[var(--color-base-accent)]/80 font-mono text-xs tracking-widest transition-colors"
                   >
-                    <Calendar size={14} /> 链接到日历
+                    <Icons.Calendar size={14} /> 链接到日历
                   </button>
                 )}
 
@@ -825,9 +821,9 @@ const TodosPage: React.FC = () => {
                   }`}
                 >
                   {selectedTodo.completed ? (
-                    <><Circle size={14} /> 标记为未完成</>
+                    <><Icons.Circle size={14} /> 标记为未完成</>
                   ) : (
-                    <><CheckCircle2 size={14} /> 标记为已完成</>
+                    <><Icons.CheckCircle size={14} /> 标记为已完成</>
                   )}
                 </button>
 
@@ -836,7 +832,7 @@ const TodosPage: React.FC = () => {
                   onClick={handleDelete}
                   className="w-full py-2 flex items-center justify-center gap-2 text-[var(--color-base-text)] hover:text-red-400 font-mono text-xs tracking-widest transition-colors"
                 >
-                  <Trash2 size={14} /> 删除
+                  <Icons.Trash size={14} /> 删除
                 </button>
               </div>
             </>
@@ -844,7 +840,7 @@ const TodosPage: React.FC = () => {
             <div className="flex-1 flex items-center justify-center p-6">
               <div className="text-center">
                 <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-[var(--color-base-border)]/30 flex items-center justify-center">
-                  <CheckCircle2 size={24} className="text-[var(--color-base-text)] opacity-30" />
+                  <Icons.CheckCircle size={24} className="text-[var(--color-base-text)] opacity-30" />
                 </div>
                 <p className="text-sm font-mono text-[var(--color-base-text)] opacity-50 tracking-widest">
                   选择一个待办查看详情
@@ -880,7 +876,7 @@ const TodosPage: React.FC = () => {
                   onClick={() => setShowCreateModal(false)}
                   className="text-[var(--color-base-text)] hover:text-[var(--color-base-text-light)]"
                 >
-                  <X size={18} />
+                  <Icons.X size={18} />
                 </button>
               </div>
 

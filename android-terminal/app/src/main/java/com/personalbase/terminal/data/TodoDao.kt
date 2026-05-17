@@ -13,8 +13,8 @@ import kotlinx.coroutines.flow.Flow
  * 
  * 提供完整的CRUD操作及多种查询方式：
  * - 按状态查询（全部/活跃/已完成）
- * - 按ID查询（本地ID和数据库ID）
- * - 状态更新（完成/同步）
+ * - 按ID查询（本地ID、服务器ID）
+ * - 状态更新（完成/同步/serverId更新）
  */
 @Dao
 interface TodoDao {
@@ -46,7 +46,11 @@ interface TodoDao {
     @Query("SELECT * FROM todos WHERE localId = :localId LIMIT 1")
     suspend fun getTodoByLocalId(localId: String): TodoEntity?
 
-    // 根据数据库ID查询待办
+    // 根据服务器ID查询待办
+    @Query("SELECT * FROM todos WHERE serverId = :serverId LIMIT 1")
+    suspend fun getTodoByServerId(serverId: Int): TodoEntity?
+
+    // 根据数据库本地ID查询待办
     @Query("SELECT * FROM todos WHERE id = :id LIMIT 1")
     suspend fun getTodoById(id: Int): TodoEntity?
 
@@ -61,4 +65,25 @@ interface TodoDao {
     // 更新待办的同步时间戳（同步成功后调用）
     @Query("UPDATE todos SET syncedAt = :syncedAt WHERE localId = :localId")
     suspend fun updateSyncedAt(localId: String, syncedAt: Long)
+
+    // 根据localId更新serverId（同步后调用，建立本地与服务器的关联）
+    @Query("UPDATE todos SET serverId = :serverId, syncedAt = :syncedAt WHERE localId = :localId")
+    suspend fun updateServerIdByLocalId(localId: String, serverId: Int, syncedAt: Long)
+
+    // 根据serverId更新同步信息（从服务器拉取更新后调用）
+    @Query("UPDATE todos SET title = :title, description = :description, dueDate = :dueDate, completed = :completed, updatedAt = :updatedAt, syncedAt = :syncedAt, importance = :importance WHERE serverId = :serverId")
+    suspend fun updateByServerId(
+        serverId: Int,
+        title: String,
+        description: String?,
+        dueDate: Long?,
+        completed: Boolean,
+        updatedAt: Long,
+        syncedAt: Long,
+        importance: Int
+    )
+
+    // 批量更新serverId（同步后调用）
+    @Query("UPDATE todos SET serverId = :serverId, syncedAt = :syncedAt WHERE localId = :localId")
+    suspend fun updateServerIdBatch(localId: String, serverId: Int, syncedAt: Long)
 }

@@ -19,17 +19,17 @@
 
 import React from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { Home, Grid, Radio, Archive } from 'lucide-react';
+import { Icons } from './SVGs';
 import { motion } from 'framer-motion';
 
 const Sidebar: React.FC = () => {
   const location = useLocation();
 
   const navItems = [
-    { path: '/', label: '主基地', icon: Home },
-    { path: '/wall', label: '碎片墙', icon: Grid },
-    { path: '/echo', label: '回响', icon: Radio },
-    { path: '/archive', label: '档案馆', icon: Archive },
+    { path: '/', label: '主基地', icon: Icons.Home },
+    { path: '/wall', label: '碎片墙', icon: Icons.Grid },
+    { path: '/echo', label: '回响', icon: Icons.Radio },
+    { path: '/archive', label: '档案馆', icon: Icons.Archive },
   ];
 
   return (

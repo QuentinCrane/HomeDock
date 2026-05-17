@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { X } from 'lucide-react';
+import { Icons } from './SVGs';
 import type { CapsuleStatus } from '../api';
 
 type FilterType = 'all' | 'text' | 'image' | 'audio';
@@ -136,7 +136,7 @@ export const FragmentFilterBar: React.FC<FragmentFilterBarProps> = ({
             onClick={handleReset}
             className="px-3 py-1.5 text-[10px] font-mono text-[var(--color-base-text)] hover:text-[var(--color-base-accent)] flex items-center gap-1 transition-colors"
           >
-            <X size={12} /> 重置
+            <Icons.X size={12} /> 重置
           </button>
         )}
       </div>

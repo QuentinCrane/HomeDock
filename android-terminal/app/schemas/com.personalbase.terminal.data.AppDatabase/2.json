@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 2,
-    "identityHash": "c53d2c73c014817b7a9ac6a9bda57a77",
+    "identityHash": "e5df012a8b451728eb78269ee07f75fa",
     "entities": [
       {
         "tableName": "capsules",
@@ -80,13 +80,19 @@
       },
       {
         "tableName": "todos",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `localId` TEXT NOT NULL, `title` TEXT NOT NULL, `description` TEXT, `dueDate` INTEGER, `completed` INTEGER NOT NULL, `createdAt` INTEGER NOT NULL, `updatedAt` INTEGER, `syncedAt` INTEGER, `calendarEventId` TEXT, `importance` INTEGER NOT NULL)",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `serverId` INTEGER, `localId` TEXT NOT NULL, `title` TEXT NOT NULL, `description` TEXT, `dueDate` INTEGER, `completed` INTEGER NOT NULL, `createdAt` INTEGER NOT NULL, `updatedAt` INTEGER, `syncedAt` INTEGER, `calendarEventId` TEXT, `importance` INTEGER NOT NULL)",
         "fields": [
           {
             "fieldPath": "id",
             "columnName": "id",
             "affinity": "INTEGER",
             "notNull": true
+          },
+          {
+            "fieldPath": "serverId",
+            "columnName": "serverId",
+            "affinity": "INTEGER",
+            "notNull": false
           },
           {
             "fieldPath": "localId",
@@ -162,7 +168,7 @@
     "views": [],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'c53d2c73c014817b7a9ac6a9bda57a77')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'e5df012a8b451728eb78269ee07f75fa')"
     ]
   }
 }

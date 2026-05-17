@@ -226,7 +226,7 @@ private fun TerminalBottomNav(
     )
     
     Surface(
-        color = Color(0xFF1A1D24),
+        color = MaterialTheme.colorScheme.surface,
         tonalElevation = 4.dp
     ) {
         Row(

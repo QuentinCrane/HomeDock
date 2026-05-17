@@ -161,6 +161,49 @@ fun SettingsScreen(
                         onOptionSelected = { viewModel.setSyncRetryStrategy(it) }
                     )
 
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Todo sync status indicator
+                    val syncStatusColor = when {
+                        todoSyncState.startsWith("ERROR") -> Color(0xFFEF4444) // Red for errors
+                        todoSyncState == "SYNCING" -> Color(0xFF3B82F6) // Blue for syncing
+                        todoSyncState == "PARTIAL_SUCCESS" -> Color(0xFFF59E0B) // Orange for partial
+                        todoSyncState == "IDLE" -> Color(0xFF10B981) // Green for success
+                        else -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                    }
+                    val syncStatusText = when (todoSyncState) {
+                        "IDLE" -> "待办同步: 就绪"
+                        "SYNCING" -> "待办同步: 同步中..."
+                        "PARTIAL_SUCCESS" -> "待办同步: 部分成功"
+                        else -> if (todoSyncState.startsWith("ERROR")) "待办同步: ${todoSyncState.removePrefix("ERROR: ")}" else todoSyncState
+                    }
+                    Surface(
+                        shape = MaterialTheme.shapes.small,
+                        color = syncStatusColor.copy(alpha = 0.1f),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .border(1.dp, syncStatusColor.copy(alpha = 0.3f), MaterialTheme.shapes.small)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = if (todoSyncState.startsWith("ERROR")) Icons.Default.Error else Icons.Default.Sync,
+                                contentDescription = null,
+                                tint = syncStatusColor,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = syncStatusText,
+                                fontFamily = FontFamily.Monospace,
+                                color = syncStatusColor,
+                                fontSize = 12.sp
+                            )
+                        }
+                    }
+
                     Spacer(modifier = Modifier.height(8.dp))
 
                     // Manual IP input hint

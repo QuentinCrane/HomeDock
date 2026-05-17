@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, createContext, useContext } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useMemo, createContext, useContext } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import TopNav from './components/TopNav';
@@ -46,19 +46,10 @@ const AppContent: React.FC = () => {
     if (saved === 'day' || saved === 'night' || saved === 'auto') {
       return saved;
     }
+    // 首次访问：默认 auto，存入 localStorage 防止下次重复初始化
+    localStorage.setItem('themePreference', 'auto');
     return 'auto';
   });
-
-  // 组件挂载时，如果 localStorage 没有偏好，则设为 'auto'（仅首次）
-  const initRef = React.useRef(false);
-  useEffect(() => {
-    if (initRef.current) return;
-    initRef.current = true;
-    if (!localStorage.getItem('themePreference')) {
-      localStorage.setItem('themePreference', 'auto');
-      setThemePreference('auto');
-    }
-  }, []);
 
   // 当前时间的小时数，用于自动主题计算
   const [now, setNow] = useState(() => new Date().getHours());
@@ -102,7 +93,8 @@ const AppContent: React.FC = () => {
   }, [themePreference]);
 
   // 同步主题到 document.documentElement（供 CSS 选择器和 BaseMapView 自动检测使用）
-  useEffect(() => {
+  // 使用 useLayoutEffect 确保在浏览器绘制前同步设置主题，防止主题切换时的视觉闪烁
+  useLayoutEffect(() => {
     document.documentElement.setAttribute('data-theme', effectiveTheme);
   }, [effectiveTheme]);
 
@@ -148,7 +140,7 @@ const AppContent: React.FC = () => {
         data-silent={silentMode ? "true" : "false"}
         data-animation-intensity={animationIntensity}
         data-motion-enabled={motionEnabled ? "true" : "false"}
-        className="relative w-full h-screen text-[var(--color-base-text)] overflow-hidden flex flex-col"
+        className="relative w-full h-screen text-[var(--color-base-text)] overflow-hidden flex flex-col bg-[var(--color-base-bg)]"
         >
         {/* Top Navigation - 固定在顶部 */}
         <TopNav
@@ -161,7 +153,8 @@ const AppContent: React.FC = () => {
         />
 
         {/* 主内容区 - 在TopNav下方，自动填满剩余空间 */}
-        <div className="relative z-10 w-full flex-1 min-h-0 flex flex-col">
+        {/* TopNav 高度约 36px + top-3(12px) = 48px，使用 pt-12 留出空间 */}
+        <div className="relative z-10 w-full flex-1 min-h-0 flex flex-col pt-12">
           <AnimatePresence mode="wait">
             <Routes location={location} key={location.pathname}>
               <Route path="/" element={
@@ -244,16 +237,17 @@ const AppContent: React.FC = () => {
         {/* 背景网格 */}
         <div className="absolute inset-0 pointer-events-none bg-grid"></div>
 
-        {/* 顶部和底部渐变光晕 */}
-        <div className="absolute inset-0 pointer-events-none overflow-hidden">
-          <div className={`absolute top-0 left-1/4 right-1/4 h-[300px] rounded-full blur-[150px] transition-all ${motionEnabled ? 'duration-1000' : 'duration-0'} ${
-            isDay 
-              ? 'bg-gradient-to-b from-amber-200/20 to-transparent' 
+        {/* 顶部和底部渐变光晕 - 使用 mesh-gradient 营造空间感 */}
+        {/* 降低模糊半径至 100px/80px 以提升性能，使用 style 替代 className 设置 will-change */}
+        <div className="absolute inset-0 pointer-events-none overflow-hidden" style={{ willChange: 'opacity' }}>
+          <div className={`absolute top-0 left-1/4 right-1/4 h-[300px] rounded-full blur-[100px] transition-all ${motionEnabled ? 'duration-1000' : 'duration-0'} ${
+            isDay
+              ? 'bg-gradient-to-b from-amber-200/20 to-transparent'
               : 'bg-gradient-to-b from-blue-900/15 to-transparent'
           }`}></div>
-          <div className={`absolute bottom-0 left-1/3 right-1/3 h-[200px] rounded-full blur-[120px] transition-all ${motionEnabled ? 'duration-1000' : 'duration-0'} ${
-            isDay 
-              ? 'bg-gradient-to-t from-orange-100/15 to-transparent' 
+          <div className={`absolute bottom-0 left-1/3 right-1/3 h-[200px] rounded-full blur-[80px] transition-all ${motionEnabled ? 'duration-1000' : 'duration-0'} ${
+            isDay
+              ? 'bg-gradient-to-t from-orange-100/15 to-transparent'
               : 'bg-gradient-to-t from-purple-950/10 to-transparent'
           }`}></div>
         </div>

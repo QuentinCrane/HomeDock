@@ -85,7 +85,8 @@ data class TodoData(
     val createdAt: Long,
     val updatedAt: Long?,
     val syncedAt: Long?,
-    val calendarEventId: String?
+    val calendarEventId: String?,
+    val importance: Int = 0
 )
 
 data class TodoResponse(
@@ -113,18 +114,25 @@ data class TodoSyncItem(
     val createdAt: Long,
     val updatedAt: Long?,
     val calendarEventId: String?,
-    val serverId: Int?
+    val importance: Int = 0,
+    val serverId: Int? = null
 )
 
 data class SyncResponse(
     val success: Boolean,
-    val data: List<TodoSyncResult>?
+    val data: SyncData?
+)
+
+data class SyncData(
+    val results: List<TodoSyncResult>,
+    val syncedAt: Long
 )
 
 data class TodoSyncResult(
     val localId: String,
     val serverId: Int?,
-    val action: String
+    val action: String,
+    val message: String? = null
 )
 
 data class MessageResponse(

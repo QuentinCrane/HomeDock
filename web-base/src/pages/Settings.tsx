@@ -24,32 +24,12 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { fetchStatus } from '../api';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  Moon, 
-  Sun, 
-  Monitor,
-  HardDrive,
-  Clock,
-  Database,
-  Info,
-  Heart,
-  Settings as SettingsIcon,
-  RefreshCw,
-  AlertCircle,
-  Check,
-  Sparkles,
-  Zap,
-  Layers,
-  Flame,
-  Volume2,
-  Vibrate,
-  Palette
-} from 'lucide-react';
-import { 
-  getSoundPreference, 
-  setSoundPreference, 
-  getVibrationPreference, 
-  setVibrationPreference 
+import { Icons } from '../components/SVGs';
+import {
+  getSoundPreference,
+  setSoundPreference,
+  getVibrationPreference,
+  setVibrationPreference
 } from '../sound';
 import { useTheme } from '../context/ThemeContext';
 import dayjs from 'dayjs';
@@ -83,7 +63,7 @@ const ErrorBanner: React.FC<{ message: string; onDismiss: () => void; onRetry?: 
     className="mb-4 p-3 bg-[var(--color-base-error)]/20 border border-[var(--color-base-error)]/40 flex items-center justify-between"
   >
     <div className="flex items-center gap-2 text-[var(--color-base-error)]">
-      <AlertCircle size={14} />
+      <Icons.AlertCircle size={14} />
       <span className="text-xs font-mono">{message}</span>
     </div>
     <div className="flex items-center gap-2">
@@ -96,7 +76,7 @@ const ErrorBanner: React.FC<{ message: string; onDismiss: () => void; onRetry?: 
         </button>
       )}
       <button onClick={onDismiss} className="text-[var(--color-base-error)] hover:opacity-70">
-        <Check size={12} />
+        <Icons.Check size={12} />
       </button>
     </div>
   </motion.div>
@@ -173,37 +153,39 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
       <div className="window-frame w-[640px] max-h-[85vh] overflow-hidden flex flex-col">
-        {/* Title Bar */}
-        <div 
-          className="window-titlebar flex items-center justify-between px-4 py-2.5 select-none"
-          style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
+        {/* Title Bar - 精简至 28px 高度，添加渐变和 macOS 风格窗口控制点 */}
+        <div
+          className="window-titlebar flex items-center justify-between px-4 py-2 select-none"
+          style={{
+            WebkitAppRegion: 'drag',
+            background: 'linear-gradient(180deg, var(--color-base-surface) 0%, var(--color-base-panel) 100%)',
+            minHeight: 28
+          } as React.CSSProperties}
         >
+          {/* macOS 风格窗口控制点 */}
+          <div className="flex items-center gap-2" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
+            <button
+              onClick={() => navigate('/')}
+              className="w-3 h-3 rounded-full bg-red-500/80 hover:bg-red-500 transition-colors flex items-center justify-center"
+              title="关闭"
+            >
+              <span className="text-red-900 opacity-0 hover:opacity-100 text-[6px]">✕</span>
+            </button>
+            <div className="w-3 h-3 rounded-full bg-yellow-500/80 hover:bg-yellow-500 transition-colors flex items-center justify-center">
+              <span className="text-yellow-900 opacity-0 hover:opacity-100 text-[6px]">─</span>
+            </div>
+            <div className="w-3 h-3 rounded-full bg-green-500/80 hover:bg-green-500 transition-colors flex items-center justify-center">
+              <span className="text-green-900 opacity-0 hover:opacity-100 text-[6px]">□</span>
+            </div>
+          </div>
+
           <div className="flex items-center gap-2.5">
-            <SettingsIcon size={16} className="text-[var(--color-base-accent)]" />
+            <Icons.Settings size={16} className="text-[var(--color-base-accent)]" />
             <span className="font-mono text-sm text-[var(--color-base-text-bright)]">Settings</span>
           </div>
-          <div className="flex items-center" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
-            <button 
-              onClick={() => navigate('/')}
-              className="window-control w-9 h-8 flex items-center justify-center hover:bg-white/10 rounded transition-colors"
-              title="Minimize"
-            >
-              <span className="text-xs">─</span>
-            </button>
-            <button 
-              className="window-control w-9 h-8 flex items-center justify-center hover:bg-white/10 rounded transition-colors"
-              title="Maximize"
-            >
-              <span className="text-xs">□</span>
-            </button>
-            <button 
-              onClick={() => navigate('/')}
-              className="window-control w-9 h-8 flex items-center justify-center hover:bg-red-500 rounded transition-colors"
-              title="Close"
-            >
-              <span className="text-xs">✕</span>
-            </button>
-          </div>
+
+          {/* 占位符，保持布局平衡 */}
+          <div className="w-16" />
         </div>
         
         {/* Content */}
@@ -229,7 +211,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
               className="mb-6"
             >
           <div className="flex items-center gap-2 mb-4">
-            <Monitor size={14} className="text-[var(--color-base-accent)]" />
+            <Icons.Monitor size={14} className="text-[var(--color-base-accent)]" />
             <h3 className="text-sm font-mono text-[var(--color-base-text-bright)] tracking-widest uppercase">
               主题
             </h3>
@@ -249,7 +231,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                 <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
                   themeMode === 'auto' ? 'bg-[var(--color-base-accent)]/20' : 'bg-[var(--color-base-border)]'
                 }`}>
-                  <Monitor size={20} className={themeMode === 'auto' ? 'text-[var(--color-base-accent)]' : 'text-[var(--color-base-text)]'} />
+                  <Icons.Monitor size={20} className={themeMode === 'auto' ? 'text-[var(--color-base-accent)]' : 'text-[var(--color-base-text)]'} />
                 </div>
                 <span className={`text-xs font-mono ${
                   themeMode === 'auto' ? 'text-[var(--color-base-accent)]' : 'text-[var(--color-base-text)]'
@@ -270,7 +252,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                 <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
                   themeMode === 'day' ? 'bg-amber-400/20' : 'bg-[var(--color-base-border)]'
                 }`}>
-                  <Sun size={20} className={themeMode === 'day' ? 'text-amber-500' : 'text-[var(--color-base-text)]'} />
+                  <Icons.Sun size={20} className={themeMode === 'day' ? 'text-amber-500' : 'text-[var(--color-base-text)]'} />
                 </div>
                 <span className={`text-xs font-mono ${
                   themeMode === 'day' ? 'text-[var(--color-base-accent)]' : 'text-[var(--color-base-text)]'
@@ -291,7 +273,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                 <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
                   themeMode === 'night' ? 'bg-[var(--color-base-accent)]/20' : 'bg-[var(--color-base-border)]'
                 }`}>
-                  <Moon size={20} className={themeMode === 'night' ? 'text-[var(--color-base-accent)]' : 'text-[var(--color-base-text)]'} />
+                  <Icons.Moon size={20} className={themeMode === 'night' ? 'text-[var(--color-base-accent)]' : 'text-[var(--color-base-text)]'} />
                 </div>
                 <span className={`text-xs font-mono ${
                   themeMode === 'night' ? 'text-[var(--color-base-accent)]' : 'text-[var(--color-base-text)]'
@@ -315,7 +297,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
           className="mb-8"
         >
           <div className="flex items-center gap-2 mb-4">
-            <Sparkles size={14} className="text-[var(--color-base-accent)]" />
+            <Icons.Sparkles size={14} className="text-[var(--color-base-accent)]" />
             <h3 className="text-sm font-mono text-[var(--color-base-text-bright)] tracking-widest uppercase">
               动画强度
             </h3>
@@ -324,10 +306,10 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
           <div className="bg-[var(--color-base-panel)] border border-[var(--color-base-border)] p-4">
             <div className="grid grid-cols-2 gap-3">
               {[
-                { value: 'off', label: '关闭', desc: '无动画', icon: <Zap size={16} /> },
-                { value: 'low', label: '低', desc: '仅页面切换', icon: <Layers size={16} /> },
-                { value: 'medium', label: '中', desc: '标准效果', icon: <Sparkles size={16} /> },
-                { value: 'high', label: '高', desc: '完整动效', icon: <Flame size={16} /> },
+                { value: 'off', label: '关闭', desc: '无动画', icon: <Icons.Zap size={16} /> },
+                { value: 'low', label: '低', desc: '仅页面切换', icon: <Icons.Layers size={16} /> },
+                { value: 'medium', label: '中', desc: '标准效果', icon: <Icons.Sparkles size={16} /> },
+                { value: 'high', label: '高', desc: '完整动效', icon: <Icons.Layers size={16} /> },
               ].map(({ value, label, desc, icon }) => (
                 <button
                   key={value}
@@ -376,7 +358,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
           className="mb-8"
         >
           <div className="flex items-center gap-2 mb-4">
-            <Volume2 size={14} className="text-[var(--color-base-accent)]" />
+            <Icons.Layers size={14} className="text-[var(--color-base-accent)]" />
             <h3 className="text-sm font-mono text-[var(--color-base-text-bright)] tracking-widest uppercase">
               声音与震动
             </h3>
@@ -387,7 +369,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
             <div className="p-4 flex items-center justify-between border-b border-[var(--color-base-border)]">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-lg bg-[var(--color-base-accent)]/10 flex items-center justify-center">
-                  <Volume2 size={14} className="text-[var(--color-base-accent)]" />
+                  <Icons.Layers size={14} className="text-[var(--color-base-accent)]" />
                 </div>
                 <div>
                   <p className="text-xs font-mono text-[var(--color-base-text-bright)]">
@@ -420,7 +402,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
             <div className="p-4 flex items-center justify-between border-b border-[var(--color-base-border)]">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-lg bg-[var(--color-base-accent)]/10 flex items-center justify-center">
-                  <Volume2 size={14} className="text-[var(--color-base-accent)]" />
+                  <Icons.Layers size={14} className="text-[var(--color-base-accent)]" />
                 </div>
                 <div>
                   <p className="text-xs font-mono text-[var(--color-base-text-bright)]">
@@ -453,7 +435,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
             <div className="p-4 flex items-center justify-between border-b border-[var(--color-base-border)]">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-lg bg-[var(--color-base-accent)]/10 flex items-center justify-center">
-                  <Volume2 size={14} className="text-[var(--color-base-accent)]" />
+                  <Icons.Layers size={14} className="text-[var(--color-base-accent)]" />
                 </div>
                 <div>
                   <p className="text-xs font-mono text-[var(--color-base-text-bright)]">
@@ -486,7 +468,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
             <div className="p-4 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-lg bg-[var(--color-base-border)] flex items-center justify-center">
-                  <Vibrate size={14} className="text-[var(--color-base-text)]" />
+                  <Icons.AlertCircle size={14} className="text-[var(--color-base-text)]" />
                 </div>
                 <div>
                   <p className="text-xs font-mono text-[var(--color-base-text-bright)]">
@@ -525,7 +507,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
           className="mb-8"
         >
           <div className="flex items-center gap-2 mb-4">
-            <Palette size={14} className="text-[var(--color-base-accent)]" />
+            <Icons.AlertCircle size={14} className="text-[var(--color-base-accent)]" />
             <h3 className="text-sm font-mono text-[var(--color-base-text-bright)] tracking-widest uppercase">
               颜色定制
             </h3>
@@ -637,7 +619,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                 className="px-4 py-2 text-xs font-mono text-[var(--color-base-text)] hover:text-[var(--color-base-error)] transition-colors flex items-center gap-2"
                 title="重置为默认颜色"
               >
-                <RefreshCw size={12} />
+                <Icons.RefreshCw size={12} />
                 重置为默认
               </button>
             </div>
@@ -652,7 +634,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
           className="mb-8"
         >
           <div className="flex items-center gap-2 mb-4">
-            <HardDrive size={14} className="text-[var(--color-base-accent)]" />
+            <Icons.Folder size={14} className="text-[var(--color-base-accent)]" />
             <h3 className="text-sm font-mono text-[var(--color-base-text-bright)] tracking-widest uppercase">
               基地信息
             </h3>
@@ -667,7 +649,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                 <div className="p-4 flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-lg bg-[var(--color-base-accent)]/20 flex items-center justify-center">
-                      <Database size={14} className="text-[var(--color-base-accent)]" />
+                      <Icons.List size={14} className="text-[var(--color-base-accent)]" />
                     </div>
                     <div>
                       <p className="text-xs font-mono text-[var(--color-base-text)] opacity-60 uppercase tracking-wider">
@@ -701,7 +683,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                 <div className="p-4 flex items-center justify-between border-t border-[var(--color-base-border)]">
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-lg bg-[var(--color-base-border)] flex items-center justify-center">
-                      <Clock size={14} className="text-[var(--color-base-text)]" />
+                      <Icons.Clock size={14} className="text-[var(--color-base-text)]" />
                     </div>
                     <div>
                       <p className="text-xs font-mono text-[var(--color-base-text)] opacity-60 uppercase tracking-wider">
@@ -723,7 +705,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                     disabled={syncing}
                     className="w-full py-2.5 flex items-center justify-center gap-2 bg-[var(--color-base-border)] hover:bg-[var(--color-base-border-highlight)] text-[var(--color-base-text-bright)] font-mono text-xs tracking-widest transition-colors disabled:opacity-50"
                   >
-                    <RefreshCw size={14} className={syncing ? 'animate-spin' : ''} />
+                    <Icons.RefreshCw size={14} className={syncing ? 'animate-spin' : ''} />
                     {syncing ? '同步中...' : '刷新数据'}
                   </button>
                 </div>
@@ -746,7 +728,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
           className="mb-8"
         >
           <div className="flex items-center gap-2 mb-4">
-            <Info size={14} className="text-[var(--color-base-accent)]" />
+            <Icons.AlertCircle size={14} className="text-[var(--color-base-accent)]" />
             <h3 className="text-sm font-mono text-[var(--color-base-text-bright)] tracking-widest uppercase">
               关于
             </h3>
@@ -755,7 +737,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
           <div className="bg-[var(--color-base-panel)] border border-[var(--color-base-border)] p-4">
             <div className="text-center mb-4">
               <div className="w-16 h-16 mx-auto mb-3 rounded-xl bg-[var(--color-base-accent)]/10 flex items-center justify-center">
-                <SettingsIcon size={28} className="text-[var(--color-base-accent)]" />
+                <Icons.Settings size={28} className="text-[var(--color-base-accent)]" />
               </div>
               <h4 className="text-lg font-mono text-[var(--color-base-text-bright)] tracking-wider">
                 个人基地 / 回港系统
@@ -786,7 +768,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
               </p>
               <div className="mt-3 flex items-center justify-center gap-1 text-[10px] font-mono text-[var(--color-base-text)] opacity-40">
                 <span>Made with</span>
-                <Heart size={10} className="text-red-400/60" />
+                <Icons.Heart size={10} className="text-red-400/60" />
                 <span>for personal sanctuary</span>
               </div>
             </div>
@@ -800,7 +782,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
           transition={{ delay: 0.3 }}
         >
           <div className="flex items-center gap-2 mb-4">
-            <SettingsIcon size={14} className="text-[var(--color-base-accent)]" />
+            <Icons.Settings size={14} className="text-[var(--color-base-accent)]" />
             <h3 className="text-sm font-mono text-[var(--color-base-text-bright)] tracking-widest uppercase">
               快捷导航
             </h3>

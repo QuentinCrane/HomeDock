@@ -1,13 +1,18 @@
-/* 字体导入 - 必须在最前面 */
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Noto+Sans+SC:wght@300;400;500;700&family=Ma+Shan+Zheng&display=swap');
-
+/* 字体定义 - 统一使用微软雅黑（Microsoft YaHei）作为全局字体 */
+/* 微软雅黑：现代中文无衬线字体，清晰易读，适合界面显示 */
+/* 移除 Google Fonts 外部依赖，使用系统自带字体，减少加载延迟 */
 @import "tailwindcss";
 
-@theme {
-  /* === 默认：夜间模式 - 深空感 === */
+/* === 主题变量定义 ===
+ * 使用 :root 和 [data-theme] 选择器而非 @theme 块，
+ * 确保主题切换时变量能正确覆盖，避免 CSS 层优先级问题
+ */
+
+/* === 默认：夜间模式 - 深空感 === */
+:root {
   /* 背景：深蓝黑墨色，非纯黑 */
   --color-base-bg: #0b0e14;
-  
+
   /* 面板：通过深度层次区分，非亮度对比 */
   /* 主面板 - 最深，几乎融入背景 */
   --color-base-panel: #0d1117;
@@ -15,33 +20,43 @@
   --color-base-panel-light: #12161e;
   /* 强调面板 - 用于卡片等独立元素 */
   --color-base-panel-raised: #161b24;
-  
+
   /* 边框 - 极低对比度，仅轮廓提示 */
   --color-base-border: #161b24;
   --color-base-border-highlight: #1e2632;
-  
+
   /* 文字 - 柔和冷白 */
   --color-base-text: #4a5568;
   --color-base-text-light: #6b7a8f;
   --color-base-text-bright: #a8b4c4;
-  
-  /* 强调色 - 低饱和青蓝 */
-  --color-base-accent: #4a7a9b;
+
+  /* 强调色 - 夜间模式改用低饱和青绿，避免 AI 蓝紫味 */
+  --color-base-accent: #5a8a7a;
   --color-base-success: #3d8b7a;
   --color-base-warning: #9a8545;
   --color-base-error: #8b4a4a;
 
-  /* 字体 - 统一使用黑体 */
-  --font-mono: 'JetBrains Mono', 'SF Mono', 'Consolas', 'Heiti SC', 'STHeiti', 'Microsoft YaHei', monospace;
-  --font-sans: 'Heiti SC', 'STHeiti', 'Microsoft YaHei', 'PingFang SC', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  --font-display: 'Ma Shan Zheng', 'Heiti SC', 'STHeiti', cursive;
-  
+  /* 字体 - 微软雅黑为全局统一字体 */
+  --font-sans: 'Microsoft YaHei', '微软雅黑', 'PingFang SC', sans-serif;
+  --font-mono: 'Microsoft YaHei', '微软雅黑', 'PingFang SC', sans-serif;
+
   /* 舱室感阴影 - 通过深度而非亮度 */
   --shadow-inner-soft: inset 0 1px 2px rgba(0, 0, 0, 0.4);
   --shadow-panel: 0 2px 6px rgba(0, 0, 0, 0.35), 0 1px 2px rgba(0, 0, 0, 0.25);
   --shadow-panel-hover: 0 4px 12px rgba(0, 0, 0, 0.4), 0 2px 4px rgba(0, 0, 0, 0.3);
   /* 浮起效果 - 用于需要明显分层的元素 */
   --shadow-raised: 0 8px 24px rgba(0, 0, 0, 0.4), 0 2px 8px rgba(0, 0, 0, 0.3);
+
+  /* 胶囊类型颜色 - 统一使用 CSS 变量，便于主题切换 */
+  /* 文字类型：蓝色系 */
+  --color-type-text: #60a5fa;
+  --color-type-text-bg: rgba(96, 165, 250, 0.12);
+  /* 图片类型：琥珀色系 */
+  --color-type-image: #fbbf24;
+  --color-type-image-bg: rgba(251, 191, 36, 0.12);
+  /* 音频类型：翠绿色系 */
+  --color-type-audio: #34d399;
+  --color-type-audio-bg: rgba(52, 211, 153, 0.12);
 }
 
 /* === 定制颜色变量 (由 ThemeContext 控制) === */
@@ -50,6 +65,7 @@
   --color-custom-secondary: #3d8b7a;
   --color-custom-bg: #0b0e14;
   --color-custom-surface: #0d1117;
+  --color-base-surface: #0d1117;
   --border-radius: 8px;
 }
 
@@ -61,20 +77,30 @@
   --color-base-panel-raised: #faf7f2;
   --color-base-border: #d8d2c6;
   --color-base-border-highlight: #c8c0b2;
-  
+
   --color-base-text: #6b5f52;
   --color-base-text-light: #4a4238;
   --color-base-text-bright: #2a2420;
-  
+
+  /* 日间模式强调色：温暖的琥珀色，与夜间模式的青绿形成对比 */
   --color-base-accent: #b07a55;
   --color-base-success: #5a8a6a;
   --color-base-warning: #a08030;
   --color-base-error: #a05555;
-  
+  --color-base-surface: #eae5dc;
+
   --shadow-inner-soft: inset 0 1px 2px rgba(0, 0, 0, 0.06);
   --shadow-panel: 0 2px 6px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
   --shadow-panel-hover: 0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.05);
   --shadow-raised: 0 6px 20px rgba(0, 0, 0, 0.08), 0 2px 6px rgba(0, 0, 0, 0.05);
+
+  /* 日间模式类型颜色：适当降低饱和度以融入温暖基调 */
+  --color-type-text: #4a8fd4;
+  --color-type-text-bg: rgba(74, 143, 212, 0.1);
+  --color-type-image: #d4940a;
+  --color-type-image-bg: rgba(212, 148, 10, 0.1);
+  --color-type-audio: #3d8a6a;
+  --color-type-audio-bg: rgba(61, 138, 106, 0.1);
 }
 
 body {
@@ -84,9 +110,8 @@ body {
   margin: 0;
   padding: 0;
   overflow: hidden;
-  transition: background-color 0.8s cubic-bezier(0.4, 0, 0.2, 1), 
-              color 0.5s ease;
-  /* 细微纹理感 */
+  /* 移除transition，防止主题初始化时的视觉闪烁 */
+  /* 主题切换的平滑过渡由 App.tsx 的 useLayoutEffect 在变化时处理 */
   position: relative;
 }
 
@@ -114,11 +139,7 @@ h1, h2, h3, h4, h5, h6 {
   color: var(--color-base-text-light);
 }
 
-.font-display {
-  font-family: var(--font-display);
-}
-
-/* 等宽字体 */
+/* 等宽字体 - 代码和数字显示 */
 code, pre, .font-mono {
   font-family: var(--font-mono);
 }
@@ -152,23 +173,30 @@ code, pre, .font-mono {
   opacity: 0.025;
 }
 
-/* 静默模式 */
-[data-silent="true"] {
-  --color-base-bg: #080a0d;
-  --color-base-panel: #0a0d12;
-  --color-base-panel-light: #0e1218;
-  --color-base-panel-raised: #111620;
-  --color-base-border: #111620;
-  --color-base-border-highlight: #181e28;
-}
-
+/* 静默模式 - 仅禁用动画，不改变主题颜色 */
+/**
+ * 静默模式设计原则：
+ * - 保持当前主题的颜色（日间/夜间），仅禁用动画
+ * - 通过降低动画时长和过渡时间来实现"静默"效果
+ * - 用户仍可正常区分日间和夜间主题
+ */
 [data-silent="true"] .bg-grid {
   opacity: 0.01;
 }
 
 [data-silent="true"] * {
   animation-duration: 0.01ms !important;
-  transition-duration: 0.3s !important;
+  animation-delay: 0ms !important;
+  transition-duration: 0.15s !important;
+}
+
+/* 静默模式下移除所有光晕和脉冲效果 */
+[data-silent="true"] .animate-pulse-glow,
+[data-silent="true"] .animate-pulse-breathe,
+[data-silent="true"] .animate-pulse-glow-intense,
+[data-silent="true"] .animate-pulse-ring,
+[data-silent="true"] .animate-shimmer {
+  animation: none !important;
 }
 
 /* === 面板组件 - 深度层次感 === */
@@ -181,13 +209,13 @@ code, pre, .font-mono {
   position: relative;
 }
 
-/* 面板内部微光 - 深度暗示 */
+/* 面板内部微光 - 深度暗示，更微妙的0.008透明度 */
 .panel::before {
   content: '';
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  background: linear-gradient(180deg, rgba(255,255,255,0.015) 0%, transparent 40%);
+  background: linear-gradient(180deg, rgba(255,255,255,0.008) 0%, transparent 40%);
   pointer-events: none;
 }
 
@@ -196,39 +224,32 @@ code, pre, .font-mono {
   box-shadow: var(--shadow-panel-hover);
 }
 
-/* 切角面板 - 机械/舱室风格（与6px圆角协调） */
-.mech-panel {
-  clip-path: polygon(
-    0 10px,
-    10px 0,
-    100% 0,
-    100% calc(100% - 10px),
-    calc(100% - 10px) 100%,
-    0 100%
-  );
+/* === 交互式卡片 - 悬停上浮、按下回弹、边框高亮 === */
+/* 提供统一的交互反馈，增强用户体验的精致感 */
+.card-interactive {
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
 }
 
-.mech-panel-right {
-  clip-path: polygon(
-    0 0,
-    calc(100% - 10px) 0,
-    100% 10px,
-    100% 100%,
-    10px 100%,
-    0 calc(100% - 10px)
-  );
+.card-interactive:hover {
+  transform: translateY(-1px);
+  border-color: var(--color-base-border-highlight);
+  box-shadow: var(--shadow-panel-hover);
 }
 
-/* 门/舱口风格面板 - 不对称切角 */
-.mech-door {
-  clip-path: polygon(
-    0 8px,
-    8px 0,
-    92% 0,
-    100% 8px,
-    100% 100%,
-    0 100%
-  );
+.card-interactive:active {
+  transform: scale(0.98);
+}
+
+.card-interactive:focus-visible {
+  outline: none;
+  border-color: var(--color-base-accent);
+  box-shadow: 0 0 0 2px rgba(90, 138, 122, 0.2);
+}
+
+/* 日间模式交互卡片聚焦边框适配 */
+[data-theme="day"] .card-interactive:focus-visible {
+  box-shadow: 0 0 0 2px rgba(176, 122, 85, 0.2);
 }
 
 /* === 布局区域 - 三段式舱室布局 === */
@@ -614,6 +635,88 @@ input:focus, textarea:focus {
 
 .animate-float-gentle {
   animation: float-gentle 4s ease-in-out infinite;
+}
+
+/* === 数字闪光动画 - StatsCard 数字扫光效果 === */
+/**
+ * shimmer: 数字扫光动画，营造数据流动感
+ * - 渐变从左到右扫过元素
+ * - 透明度 0.3，既能突出又不过分
+ */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.animate-shimmer {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.08) 40%,
+    rgba(255, 255, 255, 0.15) 50%,
+    rgba(255, 255, 255, 0.08) 60%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 3s ease-in-out infinite;
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+
+/* === 幽灵轨道动画 - Echo 页面背景胶囊环绕效果 === */
+/**
+ * ghost-orbit: 幽灵胶囊的缓慢环绕动画
+ * - 30秒一周期的缓慢漂移
+ * - 不同 delay 产生错落有致的层叠感
+ */
+@keyframes ghost-orbit-1 {
+  0%, 100% { transform: translate(0, 0) rotate(0deg); }
+  25% { transform: translate(15px, -10px) rotate(3deg); }
+  50% { transform: translate(5px, -20px) rotate(-2deg); }
+  75% { transform: translate(-10px, -10px) rotate(1deg); }
+}
+
+@keyframes ghost-orbit-2 {
+  0%, 100% { transform: translate(0, 0) rotate(0deg); }
+  25% { transform: translate(-12px, 8px) rotate(-2deg); }
+  50% { transform: translate(8px, 15px) rotate(3deg); }
+  75% { transform: translate(15px, 5px) rotate(-1deg); }
+}
+
+@keyframes ghost-orbit-3 {
+  0%, 100% { transform: translate(0, 0) rotate(0deg); }
+  33% { transform: translate(10px, 12px) rotate(-3deg); }
+  66% { transform: translate(-8px, -8px) rotate(2deg); }
+}
+
+@keyframes ghost-orbit-4 {
+  0%, 100% { transform: translate(0, 0) rotate(0deg); }
+  20% { transform: translate(-15px, 5px) rotate(2deg); }
+  50% { transform: translate(5px, -12px) rotate(-3deg); }
+  80% { transform: translate(12px, 8px) rotate(1deg); }
+}
+
+.animate-ghost-orbit-1 {
+  animation: ghost-orbit-1 30s ease-in-out infinite;
+}
+
+.animate-ghost-orbit-2 {
+  animation: ghost-orbit-2 35s ease-in-out infinite;
+  animation-delay: 0.5s;
+}
+
+.animate-ghost-orbit-3 {
+  animation: ghost-orbit-3 28s ease-in-out infinite;
+  animation-delay: 1s;
+}
+
+.animate-ghost-orbit-4 {
+  animation: ghost-orbit-4 32s ease-in-out infinite;
+  animation-delay: 1.5s;
 }
 
 /* === 脉冲/呼吸动画 === */
@@ -1040,7 +1143,7 @@ input:focus, textarea:focus {
 [data-custom-colors="true"] {
   /* Primary color - 用于 accent 元素 */
   --color-base-accent: var(--color-custom-primary);
-  
+
   /* Success 颜色使用 secondary */
   --color-base-success: var(--color-custom-secondary);
 }

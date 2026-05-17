@@ -22,8 +22,20 @@ class NsdHelper(context: Context) {
         }
 
         override fun onServiceResolved(serviceInfo: NsdServiceInfo) {
-            Log.i("NsdHelper", "Resolve Succeeded. ${serviceInfo.host.hostAddress}:${serviceInfo.port}")
-            _discoveredIp.value = "http://${serviceInfo.host.hostAddress}:${serviceInfo.port}"
+            try {
+                val host = serviceInfo.host ?: run {
+                    Log.w("NsdHelper", "Host is null in resolved service info")
+                    return
+                }
+                val address = host.hostAddress ?: run {
+                    Log.w("NsdHelper", "Host address is null in resolved service info")
+                    return
+                }
+                Log.i("NsdHelper", "Resolve Succeeded. $address:${serviceInfo.port}")
+                _discoveredIp.value = "http://$address:${serviceInfo.port}"
+            } catch (e: Exception) {
+                Log.e("NsdHelper", "Error accessing resolved service info", e)
+            }
         }
     }
 

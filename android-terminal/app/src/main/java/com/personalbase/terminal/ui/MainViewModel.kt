@@ -12,6 +12,7 @@ package com.personalbase.terminal.ui
 import android.app.Application
 import android.content.Context
 import android.content.SharedPreferences
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.personalbase.terminal.TerminalApp
@@ -376,9 +377,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      * 同步流程：
      * 1. 检查是否已发现主基地（baseIp）
      * 2. 获取所有本地待办事项
-     * 3. 构建 TodoSyncItem 列表
-     * 4. 通过 Retrofit 调用服务器的 /api/sync/todos 接口
-     * 5. 成功后标记所有待办为已同步状态
+     * 3. 构建 TodoSyncItem 列表（包含serverId如果有）
+     * 4. 通过 Retrofit 调用服务器的 /api/todos/sync 接口
+     * 5. 根据服务器返回的ID映射更新本地的serverId
+     * 6. 从服务器拉取待办（双向同步）
      */
     fun syncTodos() {
         val ip = baseIp.value
@@ -391,42 +393,127 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _todoSyncState.value = "SYNCING"
             try {
                 val localTodos = todoRepository.getAllTodosList()
-                if (localTodos.isEmpty()) {
-                    _todoSyncState.value = "IDLE"
-                    return@launch
-                }
 
-                val baseUrl = if (ip.endsWith("/")) ip else "$ip/"
-                val api = createRetrofit(baseUrl).create(BaseApi::class.java)
+                if (localTodos.isNotEmpty()) {
+                    val baseUrl = if (ip.endsWith("/")) ip else "$ip/"
+                    val api = createRetrofit(baseUrl).create(BaseApi::class.java)
 
-                // Upload local todos
-                val syncItems = localTodos.map { todo ->
-                    TodoSyncItem(
-                        localId = todo.localId,
-                        title = todo.title,
-                        description = todo.description,
-                        dueDate = todo.dueDate,
-                        completed = todo.completed,
-                        createdAt = todo.createdAt,
-                        updatedAt = todo.updatedAt,
-                        calendarEventId = todo.calendarEventId,
-                        serverId = null
-                    )
-                }
-
-                val response = api.syncTodos(syncItems)
-                if (response.isSuccessful && response.body()?.success == true) {
-                    // 同步成功，标记所有本地待办为已同步
-                    localTodos.forEach { todo ->
-                        todoRepository.markSynced(todo.localId)
+                    // 推送本地待办到服务器，包含serverId（如果已有）
+                    val syncItems = localTodos.map { todo ->
+                        TodoSyncItem(
+                            localId = todo.localId,
+                            title = todo.title,
+                            description = todo.description,
+                            dueDate = todo.dueDate,
+                            completed = todo.completed,
+                            createdAt = todo.createdAt,
+                            updatedAt = todo.updatedAt,
+                            calendarEventId = todo.calendarEventId,
+                            importance = todo.importance,
+                            serverId = todo.serverId  // 发送serverId让服务器知道要更新哪条记录
+                        )
                     }
+
+                    val response = api.syncTodos(syncItems)
+                    if (response.isSuccessful && response.body()?.success == true) {
+                        val syncData = response.body()?.data
+                        if (syncData != null) {
+                            // 根据服务器返回的映射更新本地的serverId
+                            syncData.results.forEach { result ->
+                                if (result.serverId != null && result.action != "error") {
+                                    todoRepository.updateServerId(result.localId, result.serverId)
+                                    Log.d("MainViewModel", "Todo synced: localId=${result.localId}, serverId=${result.serverId}, action=${result.action}")
+                                } else if (result.action == "error") {
+                                    Log.e("MainViewModel", "Todo sync error: localId=${result.localId}, message=${result.message}")
+                                }
+                            }
+                        }
+                    } else {
+                        Log.e("MainViewModel", "Sync failed: ${response.code()}")
+                        _todoSyncState.value = "PARTIAL_SUCCESS"
+                    }
+                }
+
+                // 从服务器拉取待办（双向同步）
+                fetchTodos()
+
+                if (_todoSyncState.value != "PARTIAL_SUCCESS") {
                     _todoSyncState.value = "IDLE"
-                } else {
-                    _todoSyncState.value = "PARTIAL_SUCCESS"
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
+                Log.e("MainViewModel", "syncTodos error", e)
                 _todoSyncState.value = "ERROR: ${e.message}"
+            }
+        }
+    }
+
+    /**
+     * 从服务器拉取待办事项并合并到本地
+     *
+     * 合并策略：
+     * 1. 服务器有、本地没有 → 插入新记录（保存serverId）
+     * 2. 服务器有、本地也有（相同localId）→ 以 updatedAt 较新的为准（服务器更新则覆盖本地）
+     */
+    fun fetchTodos() {
+        val ip = baseIp.value ?: return
+
+        viewModelScope.launch {
+            try {
+                val baseUrl = if (ip.endsWith("/")) ip else "$ip/"
+                val api = createRetrofit(baseUrl).create(BaseApi::class.java)
+
+                val response = api.getTodos()
+                if (response.isSuccessful && response.body()?.success == true) {
+                    val serverTodos = response.body()?.data ?: emptyList()
+                    var updatedCount = 0
+                    var insertedCount = 0
+
+                    serverTodos.forEach { todo ->
+                        val existing = todoRepository.getTodoByLocalId(todo.localId)
+                        if (existing == null) {
+                            // 本地不存在，从服务器插入新记录
+                            val entity = TodoEntity(
+                                serverId = todo.id,  // 保存服务器的数据库ID
+                                localId = todo.localId,
+                                title = todo.title,
+                                description = todo.description,
+                                dueDate = todo.dueDate,
+                                completed = todo.completed,
+                                createdAt = todo.createdAt,
+                                updatedAt = todo.updatedAt,
+                                syncedAt = System.currentTimeMillis(),
+                                calendarEventId = todo.calendarEventId,
+                                importance = todo.importance ?: 0
+                            )
+                            todoRepository.insertTodo(entity)
+                            insertedCount++
+                            Log.d("MainViewModel", "Todo inserted from server: localId=${todo.localId}, serverId=${todo.id}")
+                        } else {
+                            // 本地已存在，比较updatedAt
+                            val serverUpdatedAt = todo.updatedAt ?: 0L
+                            val localUpdatedAt = existing.updatedAt ?: 0L
+                            if (serverUpdatedAt > localUpdatedAt) {
+                                // 服务器更新，更新本地
+                                todoRepository.updateByServerId(
+                                    serverId = todo.id,
+                                    title = todo.title,
+                                    description = todo.description,
+                                    dueDate = todo.dueDate,
+                                    completed = todo.completed,
+                                    updatedAt = todo.updatedAt ?: serverUpdatedAt,
+                                    importance = todo.importance ?: 0
+                                )
+                                updatedCount++
+                                Log.d("MainViewModel", "Todo updated from server: localId=${todo.localId}, serverId=${todo.id}")
+                            }
+                            // 如果本地更新更新，不覆盖服务器的数据
+                        }
+                    }
+                    Log.d("MainViewModel", "fetchTodos completed: inserted=$insertedCount, updated=$updatedCount")
+                }
+            } catch (e: Exception) {
+                Log.e("MainViewModel", "fetchTodos error", e)
             }
         }
     }
@@ -491,30 +578,51 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         
                         var filePart: MultipartBody.Part? = null
                         if (capsule.filePath != null) {
-                            val file = File(capsule.filePath)
-                            if (file.exists()) {
-                                val fileReq = file.asRequestBody("multipart/form-data".toMediaTypeOrNull())
-                                filePart = MultipartBody.Part.createFormData("file", file.name, fileReq)
+                            try {
+                                val file = File(capsule.filePath)
+                                if (file.exists() && file.canRead()) {
+                                    val fileReq = file.asRequestBody("multipart/form-data".toMediaTypeOrNull())
+                                    filePart = MultipartBody.Part.createFormData("file", file.name, fileReq)
+                                } else {
+                                    Log.w("ReturnToPort", "File does not exist or cannot be read: ${capsule.filePath}")
+                                }
+                            } catch (e: SecurityException) {
+                                Log.e("ReturnToPort", "Security exception reading file: ${capsule.filePath}", e)
+                            } catch (e: Exception) {
+                                Log.e("ReturnToPort", "Error reading file: ${capsule.filePath}", e)
                             }
                         }
 
                         val response = api.uploadCapsule(typeReq, contentReq, tsReq, statusReq, filePart)
-                        if (response.isSuccessful && response.body()?.success == true) {
-                            // 上传成功：设置为 SYNCED 并更新状态为 ARCHIVED
-                            repository.updateSyncStatus(capsule.id, SyncStatus.SYNCED)
-                            repository.markAsArchived(capsule)
-                            uploadSuccess = true
-                            successCount++
+                        if (response.isSuccessful) {
+                            val body = response.body()
+                            if (body != null && body.success == true) {
+                                // 上传成功：设置为 SYNCED 并更新状态为 ARCHIVED
+                                repository.updateSyncStatus(capsule.id, SyncStatus.SYNCED)
+                                repository.markAsArchived(capsule)
+                                uploadSuccess = true
+                                successCount++
+                            } else {
+                                // 上传失败（服务器返回 success=false 或 body 为空）
+                                Log.e("ReturnToPort", "Upload failed: body=${body}, code=${response.code()}")
+                                // 准备重试
+                                if (attempts < maxRetries) {
+                                    // 指数退避：1s, 2s, 4s, 8s...
+                                    val delayMs = (1000L * (1 shl (attempts - 1))).coerceAtMost(10000L)
+                                    delay(delayMs)
+                                }
+                            }
                         } else {
-                            // 上传失败，准备重试
+                            // HTTP 错误
+                            Log.e("ReturnToPort", "HTTP error: ${response.code()}")
+                            // 准备重试
                             if (attempts < maxRetries) {
-                                // 指数退避：1s, 2s, 4s, 8s...
                                 val delayMs = (1000L * (1 shl (attempts - 1))).coerceAtMost(10000L)
                                 delay(delayMs)
                             }
                         }
                     } catch (e: Exception) {
-                        e.printStackTrace()
+                        Log.e("ReturnToPort", "Exception uploading capsule: ${e.message}", e)
                         // 上传异常，准备重试
                         if (attempts < maxRetries) {
                             val delayMs = (1000L * (1 shl (attempts - 1))).coerceAtMost(10000L)
@@ -528,7 +636,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     repository.updateSyncStatus(capsule.id, SyncStatus.FAILED)
                 }
             }
-            _syncState.value = if (successCount == pending.size) "IDLE" else "PARTIAL_SUCCESS"
+            _syncState.value = when {
+                successCount == pending.size -> "IDLE"
+                successCount > 0 -> "PARTIAL_SUCCESS"
+                else -> "ERROR"
+            }
         }
     }
 
@@ -588,29 +700,50 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         
                         var filePart: MultipartBody.Part? = null
                         if (capsule.filePath != null) {
-                            val file = File(capsule.filePath)
-                            if (file.exists()) {
-                                val fileReq = file.asRequestBody("multipart/form-data".toMediaTypeOrNull())
-                                filePart = MultipartBody.Part.createFormData("file", file.name, fileReq)
+                            try {
+                                val file = File(capsule.filePath)
+                                if (file.exists() && file.canRead()) {
+                                    val fileReq = file.asRequestBody("multipart/form-data".toMediaTypeOrNull())
+                                    filePart = MultipartBody.Part.createFormData("file", file.name, fileReq)
+                                } else {
+                                    Log.w("ReturnToPort", "File does not exist or cannot be read: ${capsule.filePath}")
+                                }
+                            } catch (e: SecurityException) {
+                                Log.e("ReturnToPort", "Security exception reading file: ${capsule.filePath}", e)
+                            } catch (e: Exception) {
+                                Log.e("ReturnToPort", "Error reading file: ${capsule.filePath}", e)
                             }
                         }
 
                         val response = api.uploadCapsule(typeReq, contentReq, tsReq, statusReq, filePart)
-                        if (response.isSuccessful && response.body()?.success == true) {
-                            // 上传成功：设置为 SYNCED 并更新状态为 ARCHIVED
-                            repository.updateSyncStatus(capsule.id, SyncStatus.SYNCED)
-                            repository.markAsArchived(capsule)
-                            uploadSuccess = true
-                            successCount++
+                        if (response.isSuccessful) {
+                            val body = response.body()
+                            if (body != null && body.success == true) {
+                                // 上传成功：设置为 SYNCED 并更新状态为 ARCHIVED
+                                repository.updateSyncStatus(capsule.id, SyncStatus.SYNCED)
+                                repository.markAsArchived(capsule)
+                                uploadSuccess = true
+                                successCount++
+                            } else {
+                                // 上传失败（服务器返回 success=false 或 body 为空）
+                                Log.e("ReturnToPort", "Retry upload failed: body=${body}, code=${response.code()}")
+                                // 准备重试
+                                if (attempts < maxRetries) {
+                                    val delayMs = (1000L * (1 shl (attempts - 1))).coerceAtMost(10000L)
+                                    delay(delayMs)
+                                }
+                            }
                         } else {
-                            // 上传再次失败，准备重试
+                            // HTTP 错误
+                            Log.e("ReturnToPort", "Retry HTTP error: ${response.code()}")
+                            // 准备重试
                             if (attempts < maxRetries) {
                                 val delayMs = (1000L * (1 shl (attempts - 1))).coerceAtMost(10000L)
                                 delay(delayMs)
                             }
                         }
                     } catch (e: Exception) {
-                        e.printStackTrace()
+                        Log.e("ReturnToPort", "Exception retrying capsule: ${e.message}", e)
                         // 上传异常，准备重试
                         if (attempts < maxRetries) {
                             val delayMs = (1000L * (1 shl (attempts - 1))).coerceAtMost(10000L)
@@ -624,7 +757,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     repository.updateSyncStatus(capsule.id, SyncStatus.FAILED)
                 }
             }
-            _syncState.value = if (successCount == failedCapsules.size) "IDLE" else "PARTIAL_SUCCESS"
+            _syncState.value = when {
+                successCount == failedCapsules.size -> "IDLE"
+                successCount > 0 -> "PARTIAL_SUCCESS"
+                else -> "ERROR"
+            }
         }
     }
 

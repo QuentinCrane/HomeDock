@@ -1,29 +1,20 @@
 /**
- * TopNav.tsx - 顶部导航栏组件
- * 
- * 功能说明：
- *   - 显示当前页面名称和基地状态
- *   - 提供静默模式切换按钮
- *   - 提供主题模式切换（日间/夜间/自动）
- *   - 显示 LAN 连接状态
- *   - 提供设置页面入口
- * 
- * 状态管理：
- *   - silentMode: 静默模式状态（由父组件传入）
- *   - themeMode: 主题模式（由父组件控制）
- *   - motionEnabled: 动画开关（从 AnimationContext 获取）
- * 
- * 用户交互：
- *   - 点击静默按钮：切换静默模式
- *   - 点击主题按钮：循环切换日间/夜间/自动
- *   - 点击设置按钮：导航到设置页面
+ * TopNav.tsx - Dynamic Island 风格导航栏
+ *
+ * 交互逻辑（核心）：
+ *   紧凑状态：页面名 + 状态点 + 主题按钮
+ *   展开状态：所有导航项 + 静默模式 + 主题按钮
+ *   主题按钮在两种状态下都存在，确保随时可切换
+ *
+ *   PC端：悬停展开/收起
+ *   移动端：点击展开/收起
  */
 
-import React from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Moon, Sun, Settings, Wifi, WifiOff } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useAnimation } from '../App';
+import { Icons } from './SVGs';
 
 interface TopNavProps {
   silentMode: boolean;
@@ -34,157 +25,165 @@ interface TopNavProps {
   isLANConnected?: boolean;
 }
 
+interface NavItem {
+  path: string;
+  label: string;
+  icon: React.ReactNode;
+}
+
+const navItems: NavItem[] = [
+  { path: '/', label: '归航大厅', icon: <Icons.Home size={14} /> },
+  { path: '/wall', label: '碎片墙', icon: <Icons.Grid size={14} /> },
+  { path: '/echo', label: '回响', icon: <Icons.Echo size={14} /> },
+  { path: '/archive', label: '档案馆', icon: <Icons.Archive size={14} /> },
+  { path: '/todos', label: '待办', icon: <Icons.CheckSquare size={14} /> },
+  { path: '/settings', label: '设置', icon: <Icons.Settings size={14} /> },
+];
+
 const TopNav: React.FC<TopNavProps> = ({
   silentMode,
   onToggleSilent,
   themeMode,
   effectiveTheme,
   onThemeModeChange,
-  isLANConnected = true,
 }) => {
-  // Show icon based on effective theme (actual day/night, not mode)
-  const getThemeIcon = () => {
-    if (themeMode === 'auto') {
-      return effectiveTheme === 'day' ? <Sun size={11} /> : <Moon size={11} />;
-    }
-    return themeMode === 'day' ? <Sun size={11} /> : <Moon size={11} />;
-  };
+  const [isExpanded, setIsExpanded] = useState(false);
+  const hoverTimeoutRef = useRef<number | null>(null);
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
 
-  const getThemeLabel = () => {
-    switch (themeMode) {
-      case 'auto': return '自动';
-      case 'day': return '日间';
-      case 'night': return '夜间';
-    }
-  };
-
-  const handleThemeClick = () => {
-    const nextMode = themeMode === 'auto' ? 'day' : themeMode === 'day' ? 'night' : 'auto';
-    onThemeModeChange(nextMode);
-  };
+  const navItemRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
+  const [indicatorStyle, setIndicatorStyle] = useState({ left: 0, width: 0 });
 
   const location = useLocation();
   const navigate = useNavigate();
   const { motionEnabled } = useAnimation();
 
-  // Get current page name from path
-  const getPageName = (path: string) => {
-    switch (path) {
-      case '/': return '归航大厅';
-      case '/wall': return '碎片墙';
-      case '/echo': return '回响';
-      case '/archive': return '档案馆';
-      case '/todos': return '待办';
-      case '/settings': return '设置';
-      default: return '归航大厅';
-    }
+  const currentPath = location.pathname;
+  const currentPage = navItems.find(item => item.path === currentPath)?.label || '归航大厅';
+
+  // 主题图标
+  const ThemeButton = () => {
+    const icon = themeMode === 'auto'
+      ? (effectiveTheme === 'day' ? <Icons.Sun size={12} /> : <Icons.Moon size={12} />)
+      : (themeMode === 'day' ? <Icons.Sun size={12} /> : <Icons.Moon size={12} />);
+    const label = themeMode === 'auto' ? '自动' : themeMode === 'day' ? '日间' : '夜间';
+    return (
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          const next = themeMode === 'auto' ? 'day' : themeMode === 'day' ? 'night' : 'auto';
+          onThemeModeChange(next);
+        }}
+        className="flex items-center justify-center w-6 h-6 rounded-full text-[var(--color-base-text)] hover:text-[var(--color-base-text-bright)] hover:bg-[var(--color-base-border)]/25 transition-colors"
+        title={`主题: ${label}`}
+        type="button"
+      >
+        {icon}
+      </button>
+    );
   };
 
-  const currentPage = getPageName(location.pathname);
+  // PC端悬停
+  const handleMouseEnter = () => {
+    if (isMobile) return;
+    if (hoverTimeoutRef.current !== null) {
+      clearTimeout(hoverTimeoutRef.current);
+      hoverTimeoutRef.current = null;
+    }
+    setIsExpanded(true);
+  };
 
-  // Only show TopNav on Home page, hide on all other pages
-  if (location.pathname !== '/') {
-    return null;
-  }
+  const handleMouseLeave = () => {
+    if (isMobile) return;
+    hoverTimeoutRef.current = window.setTimeout(() => setIsExpanded(false), 200);
+  };
+
+  // 移动端点击
+  const handleToggle = () => {
+    if (!isMobile) return;
+    setIsExpanded(prev => !prev);
+  };
+
+  // 更新指示器
+  useEffect(() => {
+    if (!isExpanded) return;
+    const activeItem = navItemRefs.current.get(currentPath);
+    if (activeItem) {
+      setIndicatorStyle({ left: activeItem.offsetLeft, width: activeItem.offsetWidth });
+    }
+  }, [currentPath, isExpanded]);
 
   return (
-    <header className="h-10 bg-[var(--color-base-panel)]/95 backdrop-blur-sm border-b border-[var(--color-base-border)] z-50 px-4 flex items-center justify-between">
-      {/* Left: Project name / current space */}
-      <div className="flex items-center gap-3">
-        <motion.div
-          className={`w-2 h-2 rounded-full ${
-            silentMode
-              ? 'bg-[var(--color-base-text)]/40'
-              : effectiveTheme === 'day'
-                ? 'bg-amber-400'
+    <header className="fixed top-3 left-1/2 -translate-x-1/2 z-50">
+      <div
+        className="relative rounded-full bg-[var(--color-base-panel)]/95 backdrop-blur-md border border-[var(--color-base-border)] shadow-md overflow-hidden"
+        style={{
+          width: isExpanded ? (isMobile ? 320 : 460) : 180,
+          height: 36,
+          transition: 'width 0.2s ease-out',
+        }}
+        onClick={handleToggle}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+      >
+        {/* 紧凑状态 - 展开时隐藏 */}
+        {!isExpanded && (
+          <div className="flex items-center gap-2 px-3 h-full">
+            <div className={`w-2 h-2 rounded-full ${
+              silentMode ? 'bg-[var(--color-base-text)]/40'
+                : effectiveTheme === 'day' ? 'bg-amber-400'
                 : 'bg-[var(--color-base-accent)]'
-          }`}
-          animate={motionEnabled && !silentMode ? {
-            boxShadow: [
-              '0 0 4px rgba(74, 122, 155, 0.4)',
-              '0 0 8px rgba(74, 122, 155, 0.6)',
-              '0 0 4px rgba(74, 122, 155, 0.4)',
-            ],
-          } : {}}
-          transition={{ duration: 2, repeat: Infinity }}
-        />
-        <span className="text-[11px] font-mono tracking-[0.15em] text-[var(--color-base-text-light)]">
-          <span className="opacity-50">私人基地</span>
-          <span className="mx-2 opacity-30">/</span>
-          <span className="text-[var(--color-base-text-bright)]">{currentPage}</span>
-        </span>
-      </div>
+            }`}
+            style={motionEnabled && !silentMode ? { boxShadow: '0 0 6px rgba(90, 138, 122, 0.5)' } : {}}
+            />
+            <span className="text-[11px] text-[var(--color-base-text-light)]">{currentPage}</span>
+            <div className="ml-auto flex-shrink-0">
+              <ThemeButton />
+            </div>
+          </div>
+        )}
 
-      {/* Right: Controls */}
-      <div className="flex items-center gap-1">
-        {/* Silent mode toggle */}
-        <motion.button
-          onClick={onToggleSilent}
-          className={`flex items-center gap-1.5 px-2 py-1 rounded text-[10px] font-mono ${
-            motionEnabled ? 'transition-all duration-200' : ''
-          } ${
-            silentMode
-              ? 'text-[var(--color-base-text-light)] bg-[var(--color-base-border)]/50'
-              : 'text-[var(--color-base-text)] hover:text-[var(--color-base-text-light)] hover:bg-[var(--color-base-border)]/30'
-          }`}
-          title={silentMode ? '唤醒' : '静默'}
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-        >
-          {silentMode ? <Sun size={11} /> : <Moon size={11} />}
-          <span className="hidden sm:inline">{silentMode ? '唤醒' : '静默'}</span>
-        </motion.button>
-
-        {/* Theme mode toggle */}
-        <motion.button
-          onClick={handleThemeClick}
-          className={`flex items-center gap-1.5 px-2 py-1 rounded text-[10px] font-mono ${
-            motionEnabled ? 'transition-all duration-200' : ''
-          } text-[var(--color-base-text)] hover:text-[var(--color-base-text-light)] hover:bg-[var(--color-base-border)]/30`}
-          title={`当前: ${getThemeLabel()}`}
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-        >
-          {getThemeIcon()}
-          <span className="hidden sm:inline">{getThemeLabel()}</span>
-        </motion.button>
-
-        {/* Separator */}
-        <div className="w-px h-4 bg-[var(--color-base-border)] mx-1" />
-
-        {/* LAN Status */}
-        <div 
-          className="flex items-center gap-1.5 px-2 py-1"
-          title={isLANConnected ? '已连接到基地服务' : '无法连接到基地服务'}
-        >
-          {isLANConnected ? (
-            <Wifi size={11} className="text-[var(--color-base-success)]" />
-          ) : (
-            <WifiOff size={11} className="text-red-500/70" />
-          )}
-          <span className={`text-[9px] font-mono tracking-widest ${
-            isLANConnected ? 'text-[var(--color-base-text)]/50' : 'text-red-500/70'
-          }`}>
-            LAN
-          </span>
-        </div>
-
-        {/* Separator */}
-        <div className="w-px h-4 bg-[var(--color-base-border)] mx-1" />
-
-        {/* Settings */}
-        <motion.button
-          onClick={() => navigate('/settings')}
-          className={`flex items-center gap-1.5 px-2 py-1 rounded text-[10px] font-mono ${
-            motionEnabled ? 'transition-all duration-200' : ''
-          } text-[var(--color-base-text)] hover:text-[var(--color-base-text-light)] hover:bg-[var(--color-base-border)]/30`}
-          title="设置"
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-        >
-          <Settings size={11} />
-          <span className="hidden sm:inline">设置</span>
-        </motion.button>
+        {/* 展开状态 - 使用绝对定位覆盖整个容器 */}
+        {isExpanded && (
+          <div className="absolute inset-0 flex items-center px-1.5 py-1 gap-0.5 overflow-hidden rounded-full">
+            <motion.div
+              className="absolute top-1 bottom-1 rounded-full bg-[var(--color-base-accent)]/15"
+              layoutId="nav-indicator"
+              style={{ left: indicatorStyle.left, width: indicatorStyle.width }}
+              transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+            />
+            {navItems.map((item) => {
+              const isActive = currentPath === item.path;
+              return (
+                <button
+                  key={item.path}
+                  ref={(el) => { if (el) navItemRefs.current.set(item.path, el); }}
+                  onClick={(e) => { e.stopPropagation(); navigate(item.path); }}
+                  className={`relative flex items-center gap-1 px-2 py-1.5 rounded-full text-[10px] whitespace-nowrap
+                    ${isActive ? 'text-[var(--color-base-accent)]' : 'text-[var(--color-base-text)] hover:text-[var(--color-base-text-light)]'}
+                    transition-colors`}
+                  type="button"
+                >
+                  {item.icon}
+                  <span>{item.label}</span>
+                </button>
+              );
+            })}
+            <div className="w-px h-4 bg-[var(--color-base-border)] mx-0.5" />
+            <button
+              onClick={(e) => { e.stopPropagation(); onToggleSilent(); }}
+              className={`flex items-center justify-center w-6 h-6 rounded-full
+                ${silentMode ? 'text-[var(--color-base-text-light)] bg-[var(--color-base-border)]/40' : 'text-[var(--color-base-text)] hover:bg-[var(--color-base-border)]/25'}
+                transition-colors`}
+              title={silentMode ? '唤醒' : '静默'}
+              type="button"
+            >
+              {silentMode ? <Icons.Sun size={11} /> : <Icons.Moon size={11} />}
+            </button>
+            <div className="w-px h-4 bg-[var(--color-base-border)] mx-0.5" />
+            <ThemeButton />
+          </div>
+        )}
       </div>
     </header>
   );

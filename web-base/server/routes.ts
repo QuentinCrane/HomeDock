@@ -403,10 +403,12 @@ router.get('/todos', (req, res) => {
       console.error('Error fetching todos', err);
       return res.status(500).json({ success: false, message: 'Database error' });
     }
-    // Convert completed integer to boolean
+    // Convert completed integer to boolean, ensure localId is always valid
     const todos = (rows as any[]).map(row => ({
       ...row,
-      completed: Boolean(row.completed)
+      completed: Boolean(row.completed),
+      // 确保始终有有效的 localId，用于同步识别
+      localId: row.localId || `legacy_${row.id}_${row.createdAt}`
     }));
     res.json({ success: true, data: todos });
   });
@@ -421,7 +423,8 @@ router.post('/todos', (req, res) => {
   }
 
   const createdAt = Date.now();
-  const todoLocalId = localId || `server_${createdAt}`;
+  // 始终生成 localId，确保同步机制正常工作
+  const todoLocalId = localId || `web_${createdAt}_${Math.random().toString(36).substring(2, 8)}`;
   const todoImportance = Math.min(5, Math.max(0, parseInt(importance) || 0));
 
   db.run(
@@ -505,9 +508,23 @@ router.put('/todos/:id', (req, res) => {
       if (this.changes === 0) {
         return res.status(404).json({ success: false, message: 'Todo not found' });
       }
-      // Broadcast SSE event
-      eventBroadcaster.todoUpdated({ id: parseInt(id), updatedAt });
-      res.json({ success: true, data: { id, updatedAt } });
+      // Fetch updated todo to return full data
+      db.get(`SELECT * FROM todos WHERE id = ?`, [id], (err, row: any) => {
+        if (err || !row) {
+          // Broadcast with basic info even if fetch fails
+          eventBroadcaster.todoUpdated({ id: parseInt(id), updatedAt });
+          res.json({ success: true, data: { id, updatedAt } });
+          return;
+        }
+        const updatedTodo = {
+          ...row,
+          completed: Boolean(row.completed),
+          localId: row.localId || `legacy_${row.id}_${row.createdAt}`
+        };
+        // Broadcast SSE event with full data
+        eventBroadcaster.todoUpdated(updatedTodo);
+        res.json({ success: true, data: updatedTodo });
+      });
     }
   );
 });
@@ -535,6 +552,10 @@ router.delete('/todos/:id', (req, res) => {
 });
 
 // Sync todos (bulk create/update)
+// 同步策略:
+// 1. 如果客户端发送了 serverId → 尝试 UPDATE，如果没有找到则 INSERT
+// 2. 如果客户端只发送了 localId → 检查是否已存在该 localId，存在则 UPDATE，否则 INSERT
+// 3. 返回完整的 ID 映射，包含 serverId（数据库 ID）
 router.post('/todos/sync', (req, res) => {
   const { todos } = req.body;
 
@@ -545,33 +566,105 @@ router.post('/todos/sync', (req, res) => {
   const results: any[] = [];
   const now = Date.now();
 
-  // Process each todo - either insert (if no id/serverId) or update (if has id or serverId)
-  const processTodo = (todo: any, index: number) => {
+  // Process each todo with proper upsert logic
+  const processTodo = (todo: any, index: number): Promise<void> => {
     return new Promise<void>((resolve) => {
-      const { id, serverId, localId, title, description, dueDate, completed } = todo;
+      const { id, serverId, localId, title, description, dueDate, completed, importance } = todo;
+      const todoImportance = Math.min(5, Math.max(0, parseInt(importance) || 0));
 
-      if (id || serverId) {
-        // Update existing - use id if available, otherwise serverId
-        const updateId = id || serverId;
+      // Determine the actual server ID to use
+      let targetId = id || serverId;
+
+      if (targetId) {
+        // UPDATE existing todo by id
         db.run(
-          `UPDATE todos SET title = ?, description = ?, dueDate = ?, completed = ?, updatedAt = ?, syncedAt = ? WHERE id = ?`,
-          [title, description || null, dueDate || null, completed ? 1 : 0, now, now, updateId],
+          `UPDATE todos SET title = ?, description = ?, dueDate = ?, completed = ?, updatedAt = ?, syncedAt = ?, importance = ? WHERE id = ?`,
+          [title, description || null, dueDate || null, completed ? 1 : 0, now, now, todoImportance, targetId],
           function (err) {
-            if (!err) {
-              results.push({ localId, id, action: 'updated' });
+            if (err) {
+              console.error('Error updating todo during sync', err);
+              results.push({ localId, serverId: targetId, action: 'error', message: 'Update failed' });
+              resolve();
+              return;
+            }
+            if (this.changes > 0) {
+              // UPDATE succeeded
+              results.push({ localId, serverId: targetId, action: 'updated' });
+            } else {
+              // No row found with this ID - INSERT instead
+              const insertLocalId = localId || `server_${now}_${index}`;
+              db.run(
+                `INSERT INTO todos (title, description, dueDate, completed, createdAt, updatedAt, syncedAt, localId, importance) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [title, description || null, dueDate || null, completed ? 1 : 0, now, now, now, insertLocalId, todoImportance],
+                function (err) {
+                  if (err) {
+                    console.error('Error inserting todo during sync', err);
+                    results.push({ localId, serverId: targetId, action: 'error', message: 'Insert failed' });
+                  } else {
+                    results.push({ localId: insertLocalId, serverId: this.lastID, action: 'created' });
+                  }
+                  resolve();
+                }
+              );
+              return;
             }
             resolve();
           }
         );
+      } else if (localId) {
+        // Check if localId already exists in database
+        db.get(`SELECT id FROM todos WHERE localId = ?`, [localId], (err, row: any) => {
+          if (err) {
+            console.error('Error checking localId during sync', err);
+            results.push({ localId, serverId: null, action: 'error', message: 'Lookup failed' });
+            resolve();
+            return;
+          }
+          if (row) {
+            // localId exists - UPDATE
+            const existingId = row.id;
+            db.run(
+              `UPDATE todos SET title = ?, description = ?, dueDate = ?, completed = ?, updatedAt = ?, syncedAt = ?, importance = ? WHERE id = ?`,
+              [title, description || null, dueDate || null, completed ? 1 : 0, now, now, todoImportance, existingId],
+              function (err) {
+                if (err) {
+                  console.error('Error updating todo by localId', err);
+                  results.push({ localId, serverId: existingId, action: 'error', message: 'Update failed' });
+                } else {
+                  results.push({ localId, serverId: existingId, action: 'updated' });
+                }
+                resolve();
+              }
+            );
+          } else {
+            // localId doesn't exist - INSERT with provided localId
+            db.run(
+              `INSERT INTO todos (title, description, dueDate, completed, createdAt, updatedAt, syncedAt, localId, importance) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+              [title, description || null, dueDate || null, completed ? 1 : 0, now, now, now, localId, todoImportance],
+              function (err) {
+                if (err) {
+                  console.error('Error inserting todo with localId', err);
+                  results.push({ localId, serverId: null, action: 'error', message: 'Insert failed' });
+                } else {
+                  results.push({ localId, serverId: this.lastID, action: 'created' });
+                }
+                resolve();
+              }
+            );
+          }
+        });
       } else {
-        // Insert new
-        const serverLocalId = localId || `server_${now}_${index}`;
+        // No id, serverId, or localId - generate new localId and INSERT
+        const generatedLocalId = `server_${now}_${index}_${Math.random().toString(36).substring(2, 6)}`;
         db.run(
-          `INSERT INTO todos (title, description, dueDate, completed, createdAt, updatedAt, syncedAt, localId) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-          [title, description || null, dueDate || null, completed ? 1 : 0, now, now, now, serverLocalId],
+          `INSERT INTO todos (title, description, dueDate, completed, createdAt, updatedAt, syncedAt, localId, importance) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [title, description || null, dueDate || null, completed ? 1 : 0, now, now, now, generatedLocalId, todoImportance],
           function (err) {
-            if (!err) {
-              results.push({ localId: serverLocalId, serverId: this.lastID, action: 'created' });
+            if (err) {
+              console.error('Error inserting todo without identifiers', err);
+              results.push({ localId: generatedLocalId, serverId: null, action: 'error', message: 'Insert failed' });
+            } else {
+              results.push({ localId: generatedLocalId, serverId: this.lastID, action: 'created' });
             }
             resolve();
           }
@@ -580,7 +673,13 @@ router.post('/todos/sync', (req, res) => {
     });
   };
 
-  Promise.all(todos.map((t, i) => processTodo(t, i)))
+  // Process all todos sequentially to avoid race conditions
+  let chain = Promise.resolve();
+  todos.forEach((todo, index) => {
+    chain = chain.then(() => processTodo(todo, index));
+  });
+
+  chain
     .then(() => {
       res.json({ success: true, data: { results, syncedAt: now } });
     })

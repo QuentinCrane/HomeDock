@@ -23,14 +23,10 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Icons } from '../components/SVGs';
 import type { Capsule, CapsuleStatus } from '../api';
 import { fetchCapsules, updateCapsule, deleteCapsule, restoreCapsule, emptyTrash, permanentDeleteCapsule } from '../api';
 import dayjs from 'dayjs';
-import { 
-  ArrowLeft, Edit3, Trash2, RotateCcw, Archive, Heart, FileText, Check, X, 
-  Search, Image, Music, FolderOpen, 
-  Folder, ArchiveIcon
-} from 'lucide-react';
 
 /// 简化筛选类型 - 档案柜索引
 type ArchiveFilter = 'recent' | 'week' | 'older' | 'text' | 'image' | 'audio' | 'draft' | 'archived' | 'favorited' | 'trash';
@@ -71,9 +67,9 @@ const FilterItem: React.FC<FilterItemProps> = ({ active, onClick, children }) =>
 );
 
 const typeIcons = {
-  text: FileText,
-  image: Image,
-  audio: Music,
+  text: Icons.FileText,
+  image: Icons.Image,
+  audio: Icons.Mic,
 };
 
 /// 类型颜色配置 - 使用 CSS 变量适配日/夜间模式
@@ -250,7 +246,7 @@ const ArchivePage: React.FC = () => {
   };
 
   return (
-    <div className="w-full flex-1 min-h-0 flex flex-col relative" style={{ backgroundColor: 'var(--color-base-bg)' }}>
+    <div className="w-full flex-1 min-h-0 flex flex-col relative p-4 pt-2" style={{ backgroundColor: 'var(--color-base-bg)' }}>
 
       {/* Top Bar */}
       <div className="flex items-center justify-between mb-4 pb-3 border-b border-[var(--color-base-border)]/40">
@@ -258,7 +254,7 @@ const ArchivePage: React.FC = () => {
           onClick={() => navigate('/')}
           className="flex items-center gap-2 text-[var(--color-base-text)] hover:text-[var(--color-base-accent)] transition-colors font-mono text-xs tracking-widest uppercase group"
         >
-          <ArrowLeft size={14} className="group-hover:-translate-x-1 transition-transform" />
+          <Icons.ArrowLeft size={14} className="group-hover:-translate-x-1 transition-transform" />
           [ 返回基地 ]
         </button>
 
@@ -285,7 +281,7 @@ const ArchivePage: React.FC = () => {
           {/* Header */}
           <div className="p-4 border-b border-[var(--color-base-border)]/30">
             <div className="flex items-center gap-2">
-              <FolderOpen size={16} className="text-[var(--color-base-accent)]" />
+              <Icons.FolderOpen size={16} className="text-[var(--color-base-accent)]" />
               <span className="text-[10px] font-mono text-[var(--color-base-text-bright)] tracking-widest uppercase font-medium">档案柜</span>
             </div>
           </div>
@@ -319,7 +315,7 @@ const ArchivePage: React.FC = () => {
             
             <FilterItem active={filter === 'trash'} onClick={() => setFilter('trash')}>
               <span className="flex items-center gap-2">
-                <Trash2 size={10} />
+                <Icons.Trash size={10} />
                 回收站
               </span>
             </FilterItem>
@@ -341,7 +337,7 @@ const ArchivePage: React.FC = () => {
           {/* Search header */}
           <div className="p-3 border-b border-[var(--color-base-border)]/20" style={{ backgroundColor: 'var(--color-base-panel)/30' }}>
             <div className="relative">
-              <Search size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-base-text)] opacity-40" />
+              <Icons.Search size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-base-text)] opacity-40" />
               <input
                 type="text"
                 value={searchQuery}
@@ -373,7 +369,7 @@ const ArchivePage: React.FC = () => {
                     border: '1px solid rgba(154, 133, 69, 0.3)'
                   }}
                 >
-                  <Trash2 size={9} /> 清空回收站
+                  <Icons.Trash size={9} /> 清空回收站
                 </button>
               )}
             </div>
@@ -398,7 +394,7 @@ const ArchivePage: React.FC = () => {
               <div className="h-full flex flex-col items-center justify-center gap-4">
                 <div className="w-16 h-16 rounded-xl flex items-center justify-center" 
                      style={{ backgroundColor: 'var(--color-base-panel)/50', border: '1px solid var(--color-base-border)/30' }}>
-                  <Folder size={28} className="text-[var(--color-base-text)] opacity-20" />
+                  <Icons.Folder size={28} className="text-[var(--color-base-text)] opacity-20" />
                 </div>
                 <div className="text-center">
                   <p className="text-xs font-mono text-[var(--color-base-text)] opacity-50 tracking-widest mb-1">
@@ -420,14 +416,14 @@ const ArchivePage: React.FC = () => {
                     exit={{ opacity: 0 }}
                     transition={{ duration: 0.2 }}
                   >
-                    {/* Date label */}
-                    <div className="flex items-center gap-3 mb-3">
+                    {/* Date label - 粘性定位日期标题 */}
+                    <div className="sticky top-0 z-10 flex items-center gap-3 mb-3 py-2 backdrop-blur-sm">
                       <div className="flex items-center gap-2 px-3 py-1.5 rounded-md"
-                           style={{ 
-                             backgroundColor: 'var(--color-base-panel)', 
-                             border: '1px solid var(--color-base-border)/40' 
+                           style={{
+                             backgroundColor: 'var(--color-base-panel)',
+                             border: '1px solid var(--color-base-border)/40'
                            }}>
-                        <Folder size={11} className="text-[var(--color-base-accent)] opacity-60" />
+                        <Icons.Folder size={11} className="text-[var(--color-base-accent)] opacity-60" />
                         <span className="text-[10px] font-mono text-[var(--color-base-text-bright)] tracking-wider font-medium">{date}</span>
                       </div>
                       <div className="flex-1 h-px" style={{ background: 'linear-gradient(to right, var(--color-base-border)/30, transparent)' }}></div>
@@ -514,7 +510,7 @@ const ArchivePage: React.FC = () => {
                   {selectedCapsule.deletedAt && (
                     <div className="mb-4 p-3 rounded-md" style={{ backgroundColor: 'rgba(154, 133, 69, 0.1)', border: '1px solid rgba(154, 133, 69, 0.3)' }}>
                       <div className="flex items-center gap-2 text-[9px] font-mono mb-1.5" style={{ color: '#9a8545' }}>
-                        <Trash2 size={10} />
+                        <Icons.Trash size={10} />
                         <span>已从档案柜移除</span>
                       </div>
                       <span className="text-[9px] font-mono" style={{ color: '#9a8545', opacity: 0.6 }}>
@@ -526,7 +522,7 @@ const ArchivePage: React.FC = () => {
                   {/* Content */}
                   <div className="mb-4">
                     <div className="text-[9px] font-mono text-[var(--color-base-text)] opacity-40 uppercase tracking-widest mb-2 flex items-center gap-2">
-                      <FileText size={9} />
+                      <Icons.FileText size={9} />
                       <span>原文内容</span>
                     </div>
                     {selectedCapsule.type === 'text' && (
@@ -603,7 +599,7 @@ const ArchivePage: React.FC = () => {
                         className="w-full py-2.5 flex items-center justify-center gap-2 font-mono text-xs tracking-widest transition-colors rounded-md"
                         style={{ backgroundColor: 'rgba(74, 122, 155, 0.15)', color: 'var(--color-base-accent)', border: '1px solid rgba(74, 122, 155, 0.2)' }}
                       >
-                        <RotateCcw size={13} /> 恢复档案
+                        <Icons.RotateCcw size={13} /> 恢复档案
                       </button>
                       <button
                         onClick={handlePermanentDelete}
@@ -612,7 +608,7 @@ const ArchivePage: React.FC = () => {
                         onMouseEnter={(e) => (e.currentTarget.style.opacity = '1')}
                         onMouseLeave={(e) => (e.currentTarget.style.opacity = '0.6')}
                       >
-                        <Trash2 size={12} /> 永久删除
+                        <Icons.Trash size={12} /> 永久删除
                       </button>
                     </>
                   ) : (
@@ -629,7 +625,7 @@ const ArchivePage: React.FC = () => {
                             opacity: selectedCapsule.status === 'pending' ? 0.3 : 1
                           }}
                         >
-                          <FileText size={9} /> 待整理
+                          <Icons.FileText size={9} /> 待整理
                         </button>
                         <button
                           onClick={() => handleStatusChange('favorited')}
@@ -641,7 +637,7 @@ const ArchivePage: React.FC = () => {
                             opacity: selectedCapsule.status === 'favorited' ? 0.3 : 1
                           }}
                         >
-                          <Heart size={9} /> 收藏
+                          <Icons.Heart size={9} /> 收藏
                         </button>
                         <button
                           onClick={() => handleStatusChange('archived')}
@@ -653,7 +649,7 @@ const ArchivePage: React.FC = () => {
                             opacity: selectedCapsule.status === 'archived' ? 0.3 : 1
                           }}
                         >
-                          <ArchiveIcon size={9} /> 归档
+                          <Icons.Archive size={9} /> 归档
                         </button>
                       </div>
 
@@ -666,7 +662,7 @@ const ArchivePage: React.FC = () => {
                               className="flex-1 py-2 flex items-center justify-center gap-1 font-mono text-xs transition-colors rounded-md"
                               style={{ backgroundColor: 'var(--color-base-border)', color: 'var(--color-base-text-bright)' }}
                             >
-                              <X size={11} /> 取消
+                              <Icons.X size={11} /> 取消
                             </button>
                             <button
                               onClick={handleSave}
@@ -674,7 +670,7 @@ const ArchivePage: React.FC = () => {
                               className="flex-1 py-2 flex items-center justify-center gap-1 font-mono text-xs transition-colors rounded-md disabled:opacity-50"
                               style={{ backgroundColor: 'rgba(61, 139, 122, 0.8)', color: 'var(--color-base-bg)' }}
                             >
-                              <Check size={11} /> {isSaving ? '保存中' : '保存'}
+                              <Icons.Check size={11} /> {isSaving ? '保存中' : '保存'}
                             </button>
                           </>
                         ) : (
@@ -683,7 +679,7 @@ const ArchivePage: React.FC = () => {
                             className="flex-1 py-2 flex items-center justify-center gap-2 font-mono text-xs tracking-widest transition-colors rounded-md"
                             style={{ backgroundColor: 'var(--color-base-border)/80', color: 'var(--color-base-text-bright)' }}
                           >
-                            <Edit3 size={12} /> 编辑
+                            <Icons.Edit3 size={12} /> 编辑
                           </button>
                         )}
                       </div>
@@ -696,7 +692,7 @@ const ArchivePage: React.FC = () => {
                         onMouseEnter={(e) => (e.currentTarget.style.opacity = '1')}
                         onMouseLeave={(e) => (e.currentTarget.style.opacity = '0.5')}
                       >
-                        <Trash2 size={12} /> 移出档案柜
+                        <Icons.Trash size={12} /> 移出档案柜
                       </button>
                     </>
                   )}
@@ -716,7 +712,7 @@ const ArchivePage: React.FC = () => {
                   <div className="absolute inset-0 rounded-xl transform rotate-3" style={{ backgroundColor: 'var(--color-base-border)', opacity: 0.2 }}></div>
                   <div className="absolute inset-0 rounded-xl transform -rotate-2" style={{ backgroundColor: 'var(--color-base-panel)', opacity: 0.6 }}></div>
                   <div className="absolute inset-0 rounded-xl flex items-center justify-center" style={{ backgroundColor: 'var(--color-base-bg)/80', border: '1px solid var(--color-base-border)/30' }}>
-                    <Archive size={28} className="text-[var(--color-base-text)] opacity-20" />
+                    <Icons.Archive size={28} className="text-[var(--color-base-text)] opacity-20" />
                   </div>
                 </div>
                 <p className="text-xs font-mono text-[var(--color-base-text)] opacity-50 tracking-widest text-center mb-2">
@@ -753,7 +749,7 @@ const ArchivePage: React.FC = () => {
             >
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ backgroundColor: 'rgba(154, 133, 69, 0.15)' }}>
-                  <Trash2 size={18} className="text-[#9a8545]" />
+                  <Icons.Trash size={18} className="text-[#9a8545]" />
                 </div>
                 <div>
                   <h3 className="text-sm font-mono text-[var(--color-base-text-bright)] tracking-wider">清空回收站</h3>
@@ -772,14 +768,14 @@ const ArchivePage: React.FC = () => {
                   className="flex-1 py-2 flex items-center justify-center gap-1 font-mono text-xs transition-colors rounded-md"
                   style={{ backgroundColor: 'var(--color-base-border)', color: 'var(--color-base-text-bright)' }}
                 >
-                  <X size={11} /> 取消
+                  <Icons.X size={11} /> 取消
                 </button>
                 <button
                   onClick={handleEmptyTrash}
                   className="flex-1 py-2 flex items-center justify-center gap-1 font-mono text-xs transition-colors rounded-md"
                   style={{ backgroundColor: 'rgba(154, 133, 69, 0.2)', color: '#9a8545', border: '1px solid rgba(154, 133, 69, 0.3)' }}
                 >
-                  <Trash2 size={11} /> 确认清空
+                  <Icons.Trash size={11} /> 确认清空
                 </button>
               </div>
             </motion.div>
@@ -849,13 +845,13 @@ const ArchiveFileCard: React.FC<ArchiveFileCardProps> = ({ capsule, isSelected, 
           
           {/* Meta row */}
           <div className="flex items-center gap-2.5">
-            <span className={`w-1.5 h-1.5 rounded-full ${statusStyle.dotColor}`}></span>
+            <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: statusStyle.dotColor }}></span>
             <span className="text-[9px] font-mono text-[var(--color-base-text)] opacity-50">
               {dayjs(capsule.timestamp).format('HH:mm')}
             </span>
             {isDeleted && (
               <span className="text-[9px] font-mono flex items-center gap-1" style={{ color: '#9a8545' }}>
-                <Trash2 size={8} /> 已删除
+                <Icons.Trash size={8} /> 已删除
               </span>
             )}
             <span className="ml-auto text-[8px] font-mono text-[var(--color-base-text)] opacity-30">

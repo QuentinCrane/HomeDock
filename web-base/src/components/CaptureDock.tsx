@@ -1,16 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import {
-  Image,
-  Mic,
-  MicOff,
-  Send,
-  Save,
-  Trash2,
-  X,
-  FileText,
-  Radio,
-} from 'lucide-react';
+import { Icons } from './SVGs';
 
 type CaptureMode = 'text' | 'image' | 'audio';
 
@@ -84,7 +74,7 @@ export const CaptureDock: React.FC<CaptureDockProps> = ({
               boxShadow: isRecording ? '0 0 12px rgba(239, 68, 68, 0.3)' : '0 0 8px rgba(74, 122, 155, 0.15)'
             }}
           >
-            <Radio size={16} className={isRecording ? 'text-red-400' : 'text-[var(--color-base-accent)]'} />
+            <Icons.Radio size={16} className={isRecording ? 'text-red-400' : 'text-[var(--color-base-accent)]'} />
           </motion.div>
           <div>
             <h1 className="text-sm font-mono tracking-[0.12em] text-[var(--color-base-text-bright)]">
@@ -97,9 +87,9 @@ export const CaptureDock: React.FC<CaptureDockProps> = ({
       {/* Mode Tabs */}
       <div className="flex border-b border-[var(--color-base-border)]">
         {([
-          { mode: 'text' as CaptureMode, icon: FileText, label: '文字' },
-          { mode: 'image' as CaptureMode, icon: Image, label: '图片' },
-          { mode: 'audio' as CaptureMode, icon: isRecording ? MicOff : Mic, label: '录音' },
+          { mode: 'text' as CaptureMode, icon: Icons.FileText, label: '文字' },
+          { mode: 'image' as CaptureMode, icon: Icons.Image, label: '图片' },
+          { mode: 'audio' as CaptureMode, icon: isRecording ? Icons.MicOff : Icons.Mic, label: '录音' },
         ] as const).map(({ mode, icon: Icon, label }) => (
           <motion.button
             key={mode}
@@ -160,7 +150,7 @@ export const CaptureDock: React.FC<CaptureDockProps> = ({
                   whileHover={{ scale: 1.1, backgroundColor: 'rgba(255,255,255,0.9)' }}
                   whileTap={{ scale: 0.95 }}
                 >
-                  <X size={14} />
+                  <Icons.X size={14} />
                 </motion.button>
               </motion.div>
             ) : (
@@ -175,7 +165,7 @@ export const CaptureDock: React.FC<CaptureDockProps> = ({
                   animate={{ boxShadow: ['0 0 8px rgba(74, 122, 155, 0.1)', '0 0 16px rgba(74, 122, 155, 0.2)', '0 0 8px rgba(74, 122, 155, 0.1)'] }}
                   transition={{ duration: 3, repeat: Infinity }}
                 >
-                  <Image size={22} />
+                  <Icons.Image size={22} />
                 </motion.div>
                 <div className="text-center">
                   <p className="text-xs font-mono mb-1">点击上传图片</p>
@@ -197,7 +187,7 @@ export const CaptureDock: React.FC<CaptureDockProps> = ({
                   className="text-[10px] text-[var(--color-base-text)] hover:text-[var(--color-base-accent)] flex items-center gap-1.5 transition-colors"
                   whileHover={{ x: 2 }}
                 >
-                  <Trash2 size={11} /> 重新录制
+                  <Icons.Trash size={11} /> 重新录制
                 </motion.button>
               </div>
             ) : (
@@ -214,7 +204,7 @@ export const CaptureDock: React.FC<CaptureDockProps> = ({
                   whileHover={isRecording ? {} : { y: -2, boxShadow: '0 0 20px rgba(74, 122, 155, 0.3)' }}
                   whileTap={{ scale: 0.98 }}
                 >
-                  <Mic size={28} />
+                  <Icons.Mic size={28} />
                 </motion.button>
                 <div className="text-center">
                   <p className="text-xs font-mono text-[var(--color-base-text)]">
@@ -236,7 +226,7 @@ export const CaptureDock: React.FC<CaptureDockProps> = ({
           whileHover={!isDraftDisabled && !isSaving ? { y: -1, boxShadow: '0 2px 8px rgba(0,0,0,0.2)' } : {}}
           whileTap={!isDraftDisabled && !isSaving ? { scale: 0.98 } : {}}
         >
-          <Save size={13} />
+          <Icons.Save size={13} />
           存草稿
         </motion.button>
         <motion.button
@@ -246,7 +236,7 @@ export const CaptureDock: React.FC<CaptureDockProps> = ({
           whileHover={!isSubmitDisabled && !isSaving ? { y: -2, boxShadow: '0 4px 16px rgba(74, 122, 155, 0.3)' } : {}}
           whileTap={!isSubmitDisabled && !isSaving ? { scale: 0.98 } : {}}
         >
-          <Send size={13} />
+          <Icons.Send size={13} />
           投放
         </motion.button>
       </div>

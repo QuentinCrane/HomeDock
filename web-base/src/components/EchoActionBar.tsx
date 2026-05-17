@@ -1,5 +1,5 @@
 import React from 'react';
-import { RefreshCw, Send, Sparkles, Heart } from 'lucide-react';
+import { Icons } from './SVGs';
 import type { Capsule } from '../api';
 
 interface EchoActionBarProps {
@@ -34,7 +34,7 @@ const EchoActionBar: React.FC<EchoActionBarProps> = ({
             className="flex flex-col items-center gap-3 group cursor-pointer transition-all"
           >
             <div className="w-18 h-18 border border-[var(--color-base-text)]/30 bg-[var(--color-base-panel)] flex items-center justify-center group-hover:border-[var(--color-base-text)]/60 group-hover:bg-[var(--color-base-panel-light)] transition-all duration-300 rounded-lg hover:shadow-lg hover:shadow-black/10">
-              <Sparkles 
+              <Icons.Sparkles 
                 size={22} 
                 className="text-[var(--color-base-text)]/60 group-hover:text-[var(--color-base-text)] transition-colors" 
               />
@@ -56,7 +56,7 @@ const EchoActionBar: React.FC<EchoActionBarProps> = ({
               ? 'border-red-500/60 bg-red-500/10 hover:border-red-500 hover:shadow-red-500/10' 
               : 'border-[var(--color-base-border)] bg-[var(--color-base-panel)] group-hover:border-[var(--color-base-text-light)] group-hover:bg-[var(--color-base-panel-light)] hover:shadow-black/10'
           }`}>
-            <Heart 
+            <Icons.Heart 
               size={22} 
               className={`transition-all ${isFavorited 
                 ? 'text-red-500 fill-red-500' 
@@ -77,7 +77,7 @@ const EchoActionBar: React.FC<EchoActionBarProps> = ({
           className="flex flex-col items-center gap-3 group cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed transition-all"
         >
           <div className="w-18 h-18 border border-[var(--color-base-border)] bg-[var(--color-base-panel)] flex items-center justify-center group-hover:border-[var(--color-base-text-light)] group-hover:bg-[var(--color-base-panel-light)] transition-all duration-300 rounded-lg hover:shadow-lg hover:shadow-black/10">
-            <RefreshCw 
+            <Icons.RefreshCw 
               size={22} 
               className="text-[var(--color-base-text)] group-hover:text-[var(--color-base-text-bright)] group-hover:rotate-180 transition-all duration-700" 
             />
@@ -94,7 +94,7 @@ const EchoActionBar: React.FC<EchoActionBarProps> = ({
           className="flex flex-col items-center gap-3 group cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed transition-all"
         >
           <div className="w-18 h-18 border border-[var(--color-base-accent)]/40 bg-[var(--color-base-accent)]/5 flex items-center justify-center group-hover:bg-[var(--color-base-accent)]/15 group-hover:border-[var(--color-base-accent)] transition-all duration-300 rounded-lg hover:shadow-lg hover:shadow-[var(--color-base-accent)]/10">
-            <Send 
+            <Icons.Send 
               size={22} 
               className={`text-[var(--color-base-accent)] transition-transform ${isRecapturing ? 'animate-spin' : 'group-hover:translate-x-0.5 group-hover:-translate-y-0.5'}`} 
             />

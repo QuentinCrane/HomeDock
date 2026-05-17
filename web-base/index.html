@@ -1,10 +1,41 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="night">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>HomeDock - Personal Base</title>
+    <!-- 阻塞式主题初始化 - 在CSS渲染前设置data-theme，防止主题闪烁 -->
+    <!-- 默认设置 data-theme="night"，脚本会在DOMContentLoaded前更新为正确值 -->
+    <script>
+      // 阻塞式主题初始化 - 在CSS渲染前设置data-theme，防止主题闪烁
+      // 此脚本与 App.tsx 的初始化逻辑完全一致，确保两端计算出相同的有效主题
+      (function() {
+        try {
+          var pref = localStorage.getItem('themePreference');
+          var theme = 'night'; // 默认夜间（与 :root CSS 默认一致）
+
+          // 处理逻辑与 App.tsx useState 初始化完全相同
+          if (pref === 'day' || pref === 'night' || pref === 'auto') {
+            // 有效值：直接使用
+            if (pref === 'auto') {
+              var hour = new Date().getHours();
+              theme = (hour >= 6 && hour < 18) ? 'day' : 'night';
+            } else {
+              theme = pref;
+            }
+          } else {
+            // 无效或空值：写入 'auto'（与 App.tsx 同步），并计算当前有效主题
+            localStorage.setItem('themePreference', 'auto');
+            var hour = new Date().getHours();
+            theme = (hour >= 6 && hour < 18) ? 'day' : 'night';
+          }
+
+          // 立即设置 data-theme
+          document.documentElement.setAttribute('data-theme', theme);
+        } catch(e) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

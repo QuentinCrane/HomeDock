@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Sparkles } from 'lucide-react';
+import { Icons } from './SVGs';
 import type { Capsule } from '../api';
 import dayjs from 'dayjs';
 
@@ -153,7 +153,7 @@ const EchoRevealCard: React.FC<EchoRevealCardProps> = ({ capsule, loading }) => 
             {/* 柔和的图标 */}
             <div className="relative">
               <div className="absolute inset-0 bg-[var(--color-base-accent)] opacity-5 rounded-full blur-[20px]" />
-              <Sparkles size={32} className="relative text-[var(--color-base-text)] opacity-20" />
+              <Icons.Sparkles size={32} className="relative text-[var(--color-base-text)] opacity-20" />
             </div>
             <p className="text-[var(--color-base-text)] font-serif italic text-lg opacity-50">
               档案馆中暂无记忆

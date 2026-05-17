@@ -45,6 +45,7 @@ import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
+import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material3.*
@@ -61,6 +62,8 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import android.app.DatePickerDialog
+import androidx.compose.ui.platform.LocalContext
 import com.personalbase.terminal.data.TodoEntity
 import com.personalbase.terminal.ui.MainViewModel
 import androidx.compose.animation.core.tween
@@ -79,6 +82,8 @@ fun TodosScreen(
     var selectedTab by remember { mutableStateOf(0) } // 0 = Active, 1 = Completed
     var showCreateDialog by remember { mutableStateOf(false) }
     var newTodoTitle by remember { mutableStateOf("") }
+    var newTodoDescription by remember { mutableStateOf("") }
+    var newTodoDueDate by remember { mutableLongStateOf(0L) }
     var newTodoImportance by remember { mutableIntStateOf(0) }
     
     // Calendar view state
@@ -134,6 +139,17 @@ fun TodosScreen(
                     )
                     
                     Row(verticalAlignment = Alignment.CenterVertically) {
+                        // Sync todos button
+                        IconButton(
+                            onClick = { viewModel.syncTodos() }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Sync,
+                                contentDescription = "同步待办",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                        
                         // View toggle button
                         IconButton(
                             onClick = { 
@@ -147,6 +163,8 @@ fun TodosScreen(
                                 tint = MaterialTheme.colorScheme.primary
                             )
                         }
+                        
+                        Spacer(modifier = Modifier.width(8.dp))
                         
                         Text(
                             text = "${activeTodos.size} 进行中",
@@ -265,17 +283,25 @@ fun TodosScreen(
             CreateTodoDialog(
                 title = newTodoTitle,
                 onTitleChange = { newTodoTitle = it },
+                description = newTodoDescription,
+                onDescriptionChange = { newTodoDescription = it },
+                dueDate = newTodoDueDate,
+                onDueDateChange = { newTodoDueDate = it },
                 importance = newTodoImportance,
                 onImportanceChange = { newTodoImportance = it },
                 onDismiss = {
                     showCreateDialog = false
                     newTodoTitle = ""
+                    newTodoDescription = ""
+                    newTodoDueDate = 0L
                     newTodoImportance = 0
                 },
                 onConfirm = {
                     if (newTodoTitle.isNotBlank()) {
                         viewModel.addTodo(title = newTodoTitle)
                         newTodoTitle = ""
+                        newTodoDescription = ""
+                        newTodoDueDate = 0L
                         newTodoImportance = 0
                         showCreateDialog = false
                     }
@@ -571,6 +597,10 @@ private fun TodoItem(
 private fun CreateTodoDialog(
     title: String,
     onTitleChange: (String) -> Unit,
+    description: String,
+    onDescriptionChange: (String) -> Unit,
+    dueDate: Long,
+    onDueDateChange: (Long) -> Unit,
     importance: Int,
     onImportanceChange: (Int) -> Unit,
     onDismiss: () -> Unit,
@@ -598,6 +628,21 @@ private fun CreateTodoDialog(
                     },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
+                )
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                OutlinedTextField(
+                    value = description,
+                    onValueChange = onDescriptionChange,
+                    placeholder = {
+                        Text(
+                            text = "描述 (可选)",
+                            fontFamily = FontFamily.Monospace
+                        )
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    maxLines = 2
                 )
                 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -631,6 +676,54 @@ private fun CreateTodoDialog(
                                 modifier = Modifier.size(32.dp)
                             )
                         }
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "截止日期",
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 14.sp,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                    )
+                    
+                    val context = LocalContext.current
+
+                    val datePickerDialog = remember {
+                        val calendar = Calendar.getInstance()
+                        if (dueDate > 0) {
+                            calendar.timeInMillis = dueDate
+                        }
+                        DatePickerDialog(
+                            context,
+                            { _, year, month, dayOfMonth ->
+                                val selectedCalendar = Calendar.getInstance()
+                                selectedCalendar.set(year, month, dayOfMonth, 23, 59, 59)
+                                onDueDateChange(selectedCalendar.timeInMillis)
+                            },
+                            calendar.get(Calendar.YEAR),
+                            calendar.get(Calendar.MONTH),
+                            calendar.get(Calendar.DAY_OF_MONTH)
+                        )
+                    }
+
+                    TextButton(onClick = { datePickerDialog.show() }) {
+                        Text(
+                            text = if (dueDate > 0) {
+                                val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+                                dateFormat.format(Date(dueDate))
+                            } else "未设置",
+                            fontFamily = FontFamily.Monospace,
+                            color = if (dueDate > 0) 
+                                MaterialTheme.colorScheme.primary 
+                            else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                        )
                     }
                 }
             }

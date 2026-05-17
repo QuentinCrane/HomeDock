@@ -13,7 +13,7 @@ import { useNavigate } from 'react-router-dom';
 import type { Capsule } from '../api';
 import { fetchCapsules, recaptureCapsule, updateCapsule } from '../api';
 import { motion, AnimatePresence } from 'framer-motion';
-import { RefreshCw, ArrowLeft, Sparkles, AlertCircle, Heart, Shuffle, ExternalLink } from 'lucide-react';
+import { Icons } from '../components/SVGs';
 import dayjs from 'dayjs';
 import { playEchoPickSound, vibrateFeedback, getSoundPreference, getVibrationPreference } from '../sound';
 
@@ -39,20 +39,19 @@ const EchoPage: React.FC = () => {
   );
 
   // Generate ghost capsules for deep atmospheric layering
+  // 减少至 4 个幽灵胶囊，使构图更简洁
   const ghostCapsules = useMemo(() => {
     const others = activeCapsules.filter(c => c.id !== current?.id);
     if (others.length === 0) return [];
-    
-    // 6 ghost positions around the center with blur-xl effect
+
+    // 4 个幽灵位置，围绕中心，带 CSS 轨道动画
     const positions = [
-      { x: '-120px', y: '-100px', rotate: -6, scale: 0.7, opacity: 0.15, blur: 40 },
-      { x: 'calc(100% + 100px)', y: '-80px', rotate: 8, scale: 0.65, opacity: 0.12, blur: 50 },
-      { x: '-140px', y: '120px', rotate: -4, scale: 0.6, opacity: 0.1, blur: 45 },
-      { x: 'calc(100% + 120px)', y: '100px', rotate: 5, scale: 0.55, opacity: 0.08, blur: 55 },
-      { x: '10%', y: '70%', rotate: -10, scale: 0.5, opacity: 0.06, blur: 60 },
-      { x: '80%', y: '20%', rotate: 12, scale: 0.45, opacity: 0.05, blur: 70 },
+      { x: '-120px', y: '-100px', rotate: -6, scale: 0.7, opacity: 0.12, blur: 40, delay: 0 },
+      { x: 'calc(100% + 100px)', y: '-60px', rotate: 8, scale: 0.6, opacity: 0.1, blur: 50, delay: 0.5 },
+      { x: '-100px', y: '100px', rotate: -4, scale: 0.55, opacity: 0.08, blur: 45, delay: 1 },
+      { x: 'calc(100% + 80px)', y: '80px', rotate: 5, scale: 0.5, opacity: 0.06, blur: 55, delay: 1.5 },
     ];
-    
+
     const shuffled = [...others].sort(() => Math.random() - 0.5);
     return positions.slice(0, Math.min(others.length, positions.length)).map((pos, i) => ({
       capsule: shuffled[i % shuffled.length],
@@ -169,7 +168,7 @@ const EchoPage: React.FC = () => {
   };
 
   return (
-    <div className="w-full flex-1 min-h-0 flex flex-col relative overflow-hidden" style={{ backgroundColor: 'var(--color-base-bg)' }}>
+    <div className="w-full flex-1 min-h-0 flex flex-col relative overflow-hidden p-4 pt-2" style={{ backgroundColor: 'var(--color-base-bg)' }}>
 
       {/* === 深度氛围背景层 === */}
       <div className="absolute inset-0 pointer-events-none">
@@ -190,10 +189,10 @@ const EchoPage: React.FC = () => {
             exit={{ opacity: 0, y: -20 }}
             className="absolute top-20 left-1/2 -translate-x-1/2 z-50 bg-[var(--color-base-error)] text-white px-6 py-2 text-sm font-mono flex items-center gap-2"
           >
-            <AlertCircle size={14} />
+            <Icons.AlertCircle size={14} />
             {error}
             <button onClick={() => { setError(null); loadCapsules(); }} className="ml-2 underline hover:no-underline flex items-center gap-1">
-              <RefreshCw size={12} /> 重试
+              <Icons.RefreshCw size={12} /> 重试
             </button>
           </motion.div>
         )}
@@ -231,7 +230,7 @@ const EchoPage: React.FC = () => {
           onClick={() => navigate('/')}
           className="flex items-center gap-2 text-[var(--color-base-text)] hover:text-[var(--color-base-accent)] transition-colors font-mono text-sm tracking-widest uppercase group"
         >
-          <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" />
+          <Icons.ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" />
           [ 返回基地 ]
         </button>
 
@@ -239,8 +238,12 @@ const EchoPage: React.FC = () => {
           回响池
         </h2>
 
-        <div className="w-24 text-right text-[10px] text-[var(--color-base-text)] font-mono tracking-widest">
-          记忆空间
+        {/* 进度指示器 - 显示在堆栈中的位置 */}
+        <div className="flex items-center gap-2 text-[10px] text-[var(--color-base-text)] font-mono tracking-widest">
+          <span className="opacity-50">MEMORY</span>
+          <span className="text-[var(--color-base-accent)]">{activeCapsules.length > 0 ? activeCapsules.findIndex(c => c.id === current?.id) + 1 : 0}</span>
+          <span className="opacity-30">/</span>
+          <span>{activeCapsules.length}</span>
         </div>
       </div>
 
@@ -267,6 +270,8 @@ const EchoPage: React.FC = () => {
                   style={{
                     transform: `rotate(${ghost.position.rotate}deg) scale(${ghost.position.scale})`,
                     filter: `blur(${ghost.position.blur}px)`,
+                    animation: `ghost-orbit-${idx + 1} ${30 + idx * 5}s ease-in-out infinite`,
+                    animationDelay: `${ghost.position.delay}s`,
                   }}
                 >
                   {/* 幽灵卡片 */}
@@ -313,8 +318,12 @@ const EchoPage: React.FC = () => {
             )}
           </AnimatePresence>
 
-          {/* 主卡片 - 带柔和光晕 */}
-          <div className="relative bg-[var(--color-base-panel)]/95 border border-[var(--color-base-border)]/50 rounded-2xl overflow-hidden">
+          {/* 主卡片 - 带柔和光晕和玻璃态效果 */}
+          <div className="relative bg-[var(--color-base-panel)]/95 border border-[var(--color-base-border)]/50 rounded-2xl overflow-hidden backdrop-blur-xl">
+            {/* 玻璃态内边框高光 */}
+            <div className="absolute inset-0 rounded-2xl border border-white/5 pointer-events-none" />
+            {/* 玻璃态内阴影 */}
+            <div className="absolute inset-0 rounded-2xl shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] pointer-events-none" />
             
             {/* 中心微光 */}
             <div className="absolute inset-0 pointer-events-none">
@@ -431,7 +440,7 @@ const EchoPage: React.FC = () => {
                 >
                   <div className="relative">
                     <div className="absolute inset-0 bg-[var(--color-base-accent)] opacity-5 rounded-full blur-[20px]" />
-                    <Sparkles size={32} className="relative text-[var(--color-base-text)] opacity-20" />
+                    <Icons.Sparkles size={32} className="relative text-[var(--color-base-text)] opacity-20" />
                   </div>
                   <p className="text-[var(--color-base-text)] font-serif italic text-lg opacity-50">档案馆中暂无记忆</p>
                   <p className="text-[10px] font-mono text-[var(--color-base-text)] opacity-30 tracking-widest">THE ARCHIVE AWAITS</p>
@@ -458,7 +467,7 @@ const EchoPage: React.FC = () => {
               whileHover={{ rotate: 180 }}
               transition={{ type: 'spring', stiffness: 200, damping: 15 }}
             >
-              <Shuffle size={16} className="text-[var(--color-base-accent)]" />
+              <Icons.Shuffle size={16} className="text-[var(--color-base-accent)]" />
             </motion.div>
             <span className="text-xs font-mono tracking-[0.15em] text-[var(--color-base-accent)]">再抽一条</span>
           </motion.button>
@@ -477,7 +486,7 @@ const EchoPage: React.FC = () => {
               transition={isRecapturing ? { duration: 1, repeat: Infinity, ease: 'linear' } : { type: 'spring', stiffness: 200, damping: 15 }}
               whileHover={{ rotate: 180 }}
             >
-              <RefreshCw size={16} className="text-[var(--color-base-accent)]" />
+              <Icons.RefreshCw size={16} className="text-[var(--color-base-accent)]" />
             </motion.div>
             <span className="text-xs font-mono tracking-[0.15em] text-[var(--color-base-accent)]">{isRecapturing ? '投放中...' : '重新投放'}</span>
           </motion.button>
@@ -500,7 +509,7 @@ const EchoPage: React.FC = () => {
               whileHover={{ scale: 1.1 }}
               transition={{ type: 'spring', stiffness: 400, damping: 15 }}
             >
-              <Heart size={16} className={isFavorited ? 'text-red-500' : 'text-[var(--color-base-text)] group-hover:text-red-400'} />
+              <Icons.Heart size={16} className={isFavorited ? 'text-red-500' : 'text-[var(--color-base-text)] group-hover:text-red-400'} />
             </motion.div>
             <span className={`text-xs font-mono tracking-[0.15em] ${isFavorited ? 'text-red-500' : 'text-[var(--color-base-text)] group-hover:text-red-400'}`}>
               {isFavorited ? '已收藏' : '收藏'}
@@ -516,7 +525,7 @@ const EchoPage: React.FC = () => {
               whileTap={{ scale: 0.95 }}
               transition={{ type: 'spring', stiffness: 300, damping: 20 }}
             >
-              <ExternalLink size={16} className="text-[var(--color-base-text)] group-hover:text-[var(--color-base-accent)]" />
+              <Icons.ExternalLink size={16} className="text-[var(--color-base-text)] group-hover:text-[var(--color-base-accent)]" />
               <span className="text-xs font-mono tracking-[0.15em] text-[var(--color-base-text)] group-hover:text-[var(--color-base-accent)]">查看来源</span>
             </motion.button>
           )}

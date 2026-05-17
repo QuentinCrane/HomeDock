@@ -1,5 +1,5 @@
 import React from 'react';
-import { Search } from 'lucide-react';
+import { Icons } from './SVGs';
 
 export type TimeFilter = 'all' | 'today' | 'week' | 'older';
 export type TypeFilter = 'all' | 'text' | 'image' | 'audio';
@@ -25,7 +25,7 @@ export const ArchiveSidebar: React.FC<ArchiveSidebarProps> = ({
     <div className="w-[200px] flex-shrink-0 flex flex-col overflow-y-auto custom-scrollbar">
       {/* 搜索 */}
       <div className="mb-4 relative">
-        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-base-text)] opacity-50" />
+        <Icons.Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-base-text)] opacity-50" />
         <input
           type="text"
           value={searchQuery}

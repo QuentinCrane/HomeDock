@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { ChevronRight, Image, Mic, FileText, Sparkles } from 'lucide-react';
+import { Icons } from './SVGs';
 import dayjs from 'dayjs';
 import type { Capsule } from '../api';
 import { useAnimation } from '../App';
@@ -51,10 +51,10 @@ const TypeIcon: React.FC<{ type: string; size?: number; isDay: boolean }> = ({ t
     : 'text-amber-400/40';
 
   switch (type) {
-    case 'text': return <FileText size={size} className={colorClass} />;
-    case 'image': return <Image size={size} className={colorClass} />;
-    case 'audio': return <Mic size={size} className={colorClass} />;
-    default: return <FileText size={size} className={colorClass} />;
+    case 'text': return <Icons.FileText size={size} className={colorClass} />;
+    case 'image': return <Icons.Image size={size} className={colorClass} />;
+    case 'audio': return <Icons.Mic size={size} className={colorClass} />;
+    default: return <Icons.FileText size={size} className={colorClass} />;
   }
 };
 
@@ -78,7 +78,7 @@ export const EchoPreviewCard: React.FC<EchoPreviewCardProps> = ({
             animate={motionEnabled ? { opacity: [0.3, 0.5, 0.3] } : {}}
             transition={{ duration: 3, repeat: Infinity }}
           >
-            <Sparkles size={24} className="text-[var(--color-base-text)] opacity-30" />
+            <Icons.Sparkles size={24} className="text-[var(--color-base-text)] opacity-30" />
           </motion.div>
           <p className="text-xs font-mono text-[var(--color-base-text)] opacity-40 text-center">
             回响池暂无内容
@@ -87,7 +87,7 @@ export const EchoPreviewCard: React.FC<EchoPreviewCardProps> = ({
             onClick={onNavigate}
             className="mt-1 px-3 py-1.5 text-[10px] font-mono text-[var(--color-base-accent)] hover:text-[var(--color-base-text-bright)] transition-colors flex items-center gap-1 opacity-60 hover:opacity-100"
           >
-            探索回响 <ChevronRight size={10} />
+            探索回响 <Icons.ChevronRight size={10} />
           </button>
         </div>
       </motion.div>
@@ -128,7 +128,7 @@ export const EchoPreviewCard: React.FC<EchoPreviewCardProps> = ({
               animate={motionEnabled ? { opacity: [0.6, 1, 0.6] } : {}}
               transition={{ duration: 3, repeat: Infinity }}
             >
-              <Sparkles size={12} className="text-[var(--color-base-accent)]/50" />
+              <Icons.Sparkles size={12} className="text-[var(--color-base-accent)]/50" />
             </motion.div>
             <span className="text-[10px] font-mono text-[var(--color-base-text)]/50 uppercase tracking-widest">
               回响碎片
@@ -188,7 +188,7 @@ export const EchoPreviewCard: React.FC<EchoPreviewCardProps> = ({
                 } : {}}
                 transition={{ duration: 2, repeat: Infinity }}
               >
-                <Mic size={16} className="text-[var(--color-base-accent)]/50" />
+                <Icons.Mic size={16} className="text-[var(--color-base-accent)]/50" />
               </motion.div>
               <span className="text-[10px] font-mono text-[var(--color-base-text)]/40">
                 音频回响
@@ -205,7 +205,7 @@ export const EchoPreviewCard: React.FC<EchoPreviewCardProps> = ({
           className="flex items-center justify-center mt-2"
         >
           <span className="text-[9px] font-mono text-[var(--color-base-text)]/30 group-hover:text-[var(--color-base-accent)]/50 transition-colors duration-300 flex items-center gap-1">
-            探索更多回响 <ChevronRight size={9} className="group-hover:translate-x-0.5 transition-transform" />
+            探索更多回响 <Icons.ChevronRight size={9} className="group-hover:translate-x-0.5 transition-transform" />
           </span>
         </motion.div>
       </div>

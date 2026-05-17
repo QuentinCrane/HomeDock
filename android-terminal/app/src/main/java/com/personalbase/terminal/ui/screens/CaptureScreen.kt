@@ -102,6 +102,9 @@ fun CaptureScreen(
     var showSaveSuccess by remember { mutableStateOf(false) }
     var saveSuccessMessage by remember { mutableStateOf("") }
     
+    // Text state lifted from TextCapturePanel to share with action bar
+    var captureText by remember { mutableStateOf("") }
+    
     // Image state lifted from ImageCapturePanel to share with action bar
     var selectedImageUri by remember { mutableStateOf<Uri?>(null) }
     var compressedImageUri by remember { mutableStateOf<Uri?>(null) }
@@ -158,6 +161,8 @@ fun CaptureScreen(
                     ) { mode ->
                         when (mode) {
                             CaptureMode.TEXT -> TextCapturePanel(
+                                text = captureText,
+                                onTextChange = { captureText = it },
                                 onSaveDraft = {
                                     lastInputHint = "刚刚保存为草稿"
                                     showSaveSuccess = true
@@ -243,13 +248,16 @@ fun CaptureScreen(
                 // Action buttons
                 CaptureActionBar(
                     currentMode = currentMode,
+                    text = captureText,
                     // 保存草稿按钮回调：将胶囊保存到本地数据库（asDraft=true）
                     onSaveDraft = { content, _ ->
+                        // For TEXT mode, use captureText if content is null
+                        val textContent = if (currentMode == CaptureMode.TEXT) captureText else content
                         // For IMAGE mode, use compressed path if available, otherwise original
                         val imageFilePath = if (currentMode == CaptureMode.IMAGE) {
                             compressedImageUri?.path ?: selectedImageUri?.path
                         } else null
-                        viewModel.addCapsule(currentMode.name.lowercase(), content, imageFilePath, asDraft = true)
+                        viewModel.addCapsule(currentMode.name.lowercase(), textContent, imageFilePath, asDraft = true)
                         lastInputHint = "刚刚保存为草稿"
                         showSaveSuccess = true
                         saveSuccessMessage = "已收入本地舱"
@@ -262,15 +270,21 @@ fun CaptureScreen(
                             selectedImageUri = null
                             compressedImageUri = null
                         }
+                        // Reset text state after saving
+                        if (currentMode == CaptureMode.TEXT) {
+                            captureText = ""
+                        }
                     },
                     // 投入待回港按钮回调：将胶囊添加到待回港队列（asDraft=false）
                     // 胶囊状态变为 PENDING，等待回港操作时上传
                     onSubmitToDock = { content, _ ->
+                        // For TEXT mode, use captureText if content is null
+                        val textContent = if (currentMode == CaptureMode.TEXT) captureText else content
                         // For IMAGE mode, use compressed path if available, otherwise original
                         val imageFilePath = if (currentMode == CaptureMode.IMAGE) {
                             compressedImageUri?.path ?: selectedImageUri?.path
                         } else null
-                        viewModel.addCapsule(currentMode.name.lowercase(), content, imageFilePath, asDraft = false)
+                        viewModel.addCapsule(currentMode.name.lowercase(), textContent, imageFilePath, asDraft = false)
                         lastInputHint = "已投入待回港舱"
                         showSaveSuccess = true
                         saveSuccessMessage = "已投入待回港舱"
@@ -282,6 +296,10 @@ fun CaptureScreen(
                         if (currentMode == CaptureMode.IMAGE) {
                             selectedImageUri = null
                             compressedImageUri = null
+                        }
+                        // Reset text state after saving
+                        if (currentMode == CaptureMode.TEXT) {
+                            captureText = ""
                         }
                     }
                 )
@@ -931,6 +949,7 @@ private fun formatDuration(seconds: Long): String {
 @Composable
 private fun CaptureActionBar(
     currentMode: CaptureMode,
+    text: String,
     onSaveDraft: (String?, String?) -> Unit,
     onSubmitToDock: (String?, String?) -> Unit
 ) {
@@ -940,7 +959,7 @@ private fun CaptureActionBar(
     ) {
         // Secondary button: Save draft
         OutlinedButton(
-            onClick = { onSaveDraft(null, null) },
+            onClick = { onSaveDraft(if (currentMode == CaptureMode.TEXT) text else null, null) },
             modifier = Modifier.weight(1f),
             colors = ButtonDefaults.outlinedButtonColors(
                 contentColor = MaterialTheme.colorScheme.onBackground
@@ -954,7 +973,7 @@ private fun CaptureActionBar(
 
         // Primary button: Submit to dock
         Button(
-            onClick = { onSubmitToDock(null, null) },
+            onClick = { onSubmitToDock(if (currentMode == CaptureMode.TEXT) text else null, null) },
             modifier = Modifier
                 .weight(1f)
                 .height(48.dp),
@@ -1242,15 +1261,15 @@ private fun ModeTabs(
 
 @Composable
 private fun TextCapturePanel(
+    text: String,
+    onTextChange: (String) -> Unit,
     onSaveDraft: () -> Unit,
     onSubmit: () -> Unit
 ) {
-    var text by remember { mutableStateOf("") }
-
     Column(modifier = Modifier.fillMaxSize()) {
         OutlinedTextField(
             value = text,
-            onValueChange = { text = it },
+            onValueChange = onTextChange,
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f),

@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { FileText, Image, Mic } from 'lucide-react';
+import { Icons } from './SVGs';
 import dayjs from 'dayjs';
 import { useNavigate } from 'react-router-dom';
 import type { Capsule } from '../api';
@@ -8,10 +8,10 @@ import type { Capsule } from '../api';
 // === Helpers ===
 const getTypeIcon = (type: string, size = 12) => {
   switch (type) {
-    case 'text': return <FileText size={size} />;
-    case 'image': return <Image size={size} />;
-    case 'audio': return <Mic size={size} />;
-    default: return <FileText size={size} />;
+    case 'text': return <Icons.FileText size={size} />;
+    case 'image': return <Icons.Image size={size} />;
+    case 'audio': return <Icons.Mic size={size} />;
+    default: return <Icons.FileText size={size} />;
   }
 };
 

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Trash2, RotateCcw, Archive, Heart, Edit3, Check, FileText, Radio } from 'lucide-react';
+import { Icons } from './SVGs';
 import type { Capsule, CapsuleStatus } from '../api';
 import { updateCapsule, deleteCapsule, restoreCapsule } from '../api';
 import dayjs from 'dayjs';
@@ -144,7 +144,7 @@ const FragmentEditorDrawer: React.FC<FragmentEditorDrawerProps> = ({ capsule, is
                 onClick={onClose}
                 className="p-1.5 text-[var(--color-base-text)] hover:text-[var(--color-base-text-bright)] transition-colors"
               >
-                <X size={18} />
+                <Icons.X size={18} />
               </button>
             </div>
 
@@ -250,7 +250,7 @@ const FragmentEditorDrawer: React.FC<FragmentEditorDrawerProps> = ({ capsule, is
                       onClick={() => handleStatusChange('pending')}
                       className="px-3 py-1.5 text-[10px] font-mono bg-blue-400/10 text-blue-400 hover:bg-blue-400/20 transition-colors flex items-center gap-1"
                     >
-                      <FileText size={12} /> 待整理
+                      <Icons.FileText size={12} /> 待整理
                     </button>
                   )}
                   <button
@@ -261,7 +261,7 @@ const FragmentEditorDrawer: React.FC<FragmentEditorDrawerProps> = ({ capsule, is
                         : 'bg-[var(--color-base-border)] text-[var(--color-base-text)] hover:bg-[var(--color-base-border-highlight)] hover:text-[var(--color-base-text-bright)]'
                     }`}
                   >
-                    <Heart size={12} fill={capsule.status === 'favorited' ? 'currentColor' : 'none'} />
+                    <Icons.Heart size={12} fill={capsule.status === 'favorited'} />
                     {capsule.status === 'favorited' ? '已收藏' : '收藏'}
                   </button>
                   {capsule.status !== 'archived' && (
@@ -269,7 +269,7 @@ const FragmentEditorDrawer: React.FC<FragmentEditorDrawerProps> = ({ capsule, is
                       onClick={() => handleStatusChange('archived')}
                       className="px-3 py-1.5 text-[10px] font-mono bg-slate-400/10 text-slate-400 hover:bg-slate-400/20 transition-colors flex items-center gap-1"
                     >
-                      <Archive size={12} /> 归档
+                      <Icons.Archive size={12} /> 归档
                     </button>
                   )}
                   {capsule.status !== 'draft' && (
@@ -277,7 +277,7 @@ const FragmentEditorDrawer: React.FC<FragmentEditorDrawerProps> = ({ capsule, is
                       onClick={() => handleStatusChange('draft')}
                       className="px-3 py-1.5 text-[10px] font-mono bg-amber-400/10 text-amber-400 hover:bg-amber-400/20 transition-colors flex items-center gap-1"
                     >
-                      <FileText size={12} /> 草稿
+                      <Icons.FileText size={12} /> 草稿
                     </button>
                   )}
                   {capsule.status !== 'echoing' && (
@@ -285,7 +285,7 @@ const FragmentEditorDrawer: React.FC<FragmentEditorDrawerProps> = ({ capsule, is
                       onClick={() => handleStatusChange('echoing')}
                       className="px-3 py-1.5 text-[10px] font-mono bg-purple-400/10 text-purple-400 hover:bg-purple-400/20 transition-colors flex items-center gap-1"
                     >
-                      <Radio size={12} /> 回响中
+                      <Icons.Radio size={12} /> 回响中
                     </button>
                   )}
                 </div>
@@ -297,7 +297,7 @@ const FragmentEditorDrawer: React.FC<FragmentEditorDrawerProps> = ({ capsule, is
                   onClick={handleRestore}
                   className="w-full py-2.5 flex items-center justify-center gap-2 bg-[var(--color-base-accent)] text-[var(--color-base-bg)] font-mono text-xs tracking-widest transition-colors"
                 >
-                  <RotateCcw size={14} /> 恢复
+                  <Icons.RotateCcw size={14} /> 恢复
                 </button>
               ) : (
                 <div className="flex gap-2">
@@ -314,7 +314,7 @@ const FragmentEditorDrawer: React.FC<FragmentEditorDrawerProps> = ({ capsule, is
                         disabled={isSaving}
                         className="flex-1 py-2.5 flex items-center justify-center gap-2 bg-[var(--color-base-success)] text-[var(--color-base-bg)] font-mono text-xs tracking-widest transition-colors disabled:opacity-50"
                       >
-                        <Check size={14} /> {isSaving ? '保存中...' : '保存'}
+                        <Icons.Check size={14} /> {isSaving ? '保存中...' : '保存'}
                       </button>
                     </>
                   ) : (
@@ -322,7 +322,7 @@ const FragmentEditorDrawer: React.FC<FragmentEditorDrawerProps> = ({ capsule, is
                       onClick={() => setIsEditing(true)}
                       className="flex-1 py-2.5 flex items-center justify-center gap-2 bg-[var(--color-base-border)] hover:bg-[var(--color-base-border-highlight)] text-[var(--color-base-text-bright)] font-mono text-xs tracking-widest transition-colors"
                     >
-                      <Edit3 size={14} /> 编辑
+                      <Icons.Edit3 size={14} /> 编辑
                     </button>
                   )}
                 </div>
@@ -335,7 +335,7 @@ const FragmentEditorDrawer: React.FC<FragmentEditorDrawerProps> = ({ capsule, is
                   disabled={isDeleting}
                   className="w-full py-2 flex items-center justify-center gap-2 text-[var(--color-base-text)] hover:text-red-400 font-mono text-xs tracking-widest transition-colors disabled:opacity-50"
                 >
-                  <Trash2 size={14} /> {isDeleting ? '删除中...' : '删除'}
+                  <Icons.Trash size={14} /> {isDeleting ? '删除中...' : '删除'}
                 </button>
               )}
             </div>

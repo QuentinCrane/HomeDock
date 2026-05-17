@@ -15,7 +15,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CheckCircle, XCircle, Loader } from 'lucide-react';
+import { Icons } from './SVGs';
 
 /// Toast 类型
 export type SyncToastType = 'success' | 'error' | 'progress';
@@ -77,19 +77,19 @@ const SyncToast: React.FC<SyncToastProps> = ({
   }> = {
     success: {
       border: 'var(--color-base-success)',
-      icon: <CheckCircle size={16} />,
+      icon: <Icons.CheckCircle size={16} />,
       iconColor: 'var(--color-base-success)',
       bg: 'rgba(61, 139, 122, 0.08)',
     },
     error: {
       border: 'var(--color-base-error)',
-      icon: <XCircle size={16} />,
+      icon: <Icons.XCircle size={16} />,
       iconColor: 'var(--color-base-error)',
       bg: 'rgba(139, 74, 74, 0.08)',
     },
     progress: {
       border: 'var(--color-base-accent)',
-      icon: <Loader size={16} className="animate-spin" />,
+      icon: <Icons.Loader size={16} />,
       iconColor: 'var(--color-base-accent)',
       bg: 'rgba(74, 122, 155, 0.08)',
     },
@@ -157,7 +157,7 @@ const SyncToast: React.FC<SyncToastProps> = ({
               "
               style={{ color: 'var(--color-base-text)' }}
             >
-              <XCircle size={14} />
+              <Icons.XCircle size={14} />
             </button>
           )}
         </motion.div>

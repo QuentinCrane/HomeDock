@@ -16,6 +16,7 @@
  */
 
 import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react';
+import { motion } from 'framer-motion';
 
 export type ToastType = 'info' | 'success' | 'warning' | 'error';
 
@@ -98,9 +99,20 @@ function ToastContainer({ toasts, onRemove }: { toasts: Toast[]; onRemove: (id: 
 
 function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: string) => void }) {
   const [isExiting, setIsExiting] = useState(false);
+  // 进度条动画状态
+  const [progress, setProgress] = useState(100);
 
   useEffect(() => {
     let innerTimer: ReturnType<typeof setTimeout> | undefined;
+    let progressInterval: ReturnType<typeof setInterval> | undefined;
+
+    // 进度条倒计时：每 50ms 减少进度
+    progressInterval = setInterval(() => {
+      setProgress(prev => {
+        const decrement = (50 / toast.duration) * 100;
+        return Math.max(0, prev - decrement);
+      });
+    }, 50);
 
     const outerTimer = setTimeout(() => {
       setIsExiting(true);
@@ -113,6 +125,7 @@ function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: string) =
     return () => {
       clearTimeout(outerTimer);
       if (innerTimer) clearTimeout(innerTimer);
+      if (progressInterval) clearInterval(progressInterval);
     };
   }, [toast.id, toast.duration, onRemove]);
 
@@ -123,6 +136,13 @@ function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: string) =
     error: 'border-[var(--color-base-error)] bg-[var(--color-base-panel)]',
   };
 
+  const typeColorMap: Record<ToastType, string> = {
+    info: 'var(--color-base-accent)',
+    success: 'var(--color-base-success)',
+    warning: 'var(--color-base-warning)',
+    error: 'var(--color-base-error)',
+  };
+
   const iconMap: Record<ToastType, string> = {
     info: '●',
     success: '✓',
@@ -131,36 +151,51 @@ function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: string) =
   };
 
   return (
-    <div
+    /**
+     * Toast 滑入动画：从右侧滑入视图
+     * 包含底部进度条，显示剩余时间
+     */
+    <motion.div
+      initial={{ opacity: 0, x: 50, scale: 0.95 }}
+      animate={{ opacity: isExiting ? 0 : 1, x: isExiting ? 30 : 0, scale: isExiting ? 0.95 : 1 }}
+      exit={{ opacity: 0, x: 30, scale: 0.95 }}
+      transition={{ type: 'spring', stiffness: 300, damping: 25 }}
       className={`
         pointer-events-auto
-        flex items-center gap-3 px-4 py-3 
+        flex flex-col
         border rounded-lg shadow-lg
         backdrop-blur-md
         min-w-[200px] max-w-[320px]
+        overflow-hidden
         ${typeStyles[toast.type]}
-        ${isExiting ? 'opacity-0 translate-x-4' : 'opacity-100 translate-x-0'}
-        transition-all duration-200 ease-out
       `}
     >
-      <span className={`text-sm font-mono ${
-        toast.type === 'info' ? 'text-[var(--color-base-accent)]' :
-        toast.type === 'success' ? 'text-[var(--color-base-success)]' :
-        toast.type === 'warning' ? 'text-[var(--color-base-warning)]' :
-        'text-[var(--color-base-error)]'
-      }`}>
-        {iconMap[toast.type]}
-      </span>
-      <span className="text-xs font-mono text-[var(--color-base-text-light)] tracking-wide">
-        {toast.message}
-      </span>
-      <button
-        onClick={() => onRemove(toast.id)}
-        className="ml-auto text-[var(--color-base-text)] hover:text-[var(--color-base-text-bright)] opacity-50 hover:opacity-100 transition-opacity text-xs"
-      >
-        ✕
-      </button>
-    </div>
+      {/* Toast 内容 */}
+      <div className="flex items-center gap-3 px-4 py-3">
+        <span className={`text-sm font-mono`} style={{ color: typeColorMap[toast.type] }}>
+          {iconMap[toast.type]}
+        </span>
+        <span className="text-xs font-mono text-[var(--color-base-text-light)] tracking-wide">
+          {toast.message}
+        </span>
+        <button
+          onClick={() => onRemove(toast.id)}
+          className="ml-auto text-[var(--color-base-text)] hover:text-[var(--color-base-text-bright)] opacity-50 hover:opacity-100 transition-opacity text-xs"
+        >
+          ✕
+        </button>
+      </div>
+
+      {/* 进度条 - 从左到右自动收缩 */}
+      <div className="h-0.5 w-full bg-[var(--color-base-border)]/20">
+        <motion.div
+          className="h-full"
+          style={{ backgroundColor: typeColorMap[toast.type] }}
+          animate={{ width: `${progress}%` }}
+          transition={{ duration: 0.05, ease: 'linear' }}
+        />
+      </div>
+    </motion.div>
   );
 }
 

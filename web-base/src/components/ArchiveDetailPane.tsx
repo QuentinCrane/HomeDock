@@ -1,10 +1,8 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Icons } from './SVGs';
 import type { Capsule, CapsuleStatus } from '../api';
 import dayjs from 'dayjs';
-import {
-  Edit3, Trash2, RotateCcw, Archive, Heart, FileText, Check, X,
-} from 'lucide-react';
 
 const statusConfig: Record<string, { label: string; color: string; bgColor: string }> = {
   draft: { label: '草稿', color: 'text-amber-400', bgColor: 'bg-amber-400/10' },
@@ -144,28 +142,28 @@ export const ArchiveDetailPane: React.FC<ArchiveDetailPaneProps> = ({
                     disabled={selectedCapsule.status === 'pending'}
                     className="px-2 py-1 text-[9px] font-mono bg-blue-400/10 text-blue-400 hover:bg-blue-400/20 transition-colors disabled:opacity-30 flex items-center gap-1"
                   >
-                    <FileText size={10} /> 待整理
+                    <Icons.FileText size={10} /> 待整理
                   </button>
                   <button
                     onClick={() => onStatusChange('favorited')}
                     disabled={selectedCapsule.status === 'favorited'}
                     className="px-2 py-1 text-[9px] font-mono bg-emerald-400/10 text-emerald-400 hover:bg-emerald-400/20 transition-colors disabled:opacity-30 flex items-center gap-1"
                   >
-                    <Heart size={10} /> 收藏
+                    <Icons.Heart size={10} /> 收藏
                   </button>
                   <button
                     onClick={() => onStatusChange('archived')}
                     disabled={selectedCapsule.status === 'archived'}
                     className="px-2 py-1 text-[9px] font-mono bg-slate-400/10 text-slate-400 hover:bg-slate-400/20 transition-colors disabled:opacity-30 flex items-center gap-1"
                   >
-                    <Archive size={10} /> 归档
+                    <Icons.Archive size={10} /> 归档
                   </button>
                   <button
                     onClick={() => onStatusChange('draft')}
                     disabled={selectedCapsule.status === 'draft'}
                     className="px-2 py-1 text-[9px] font-mono bg-amber-400/10 text-amber-400 hover:bg-amber-400/20 transition-colors disabled:opacity-30 flex items-center gap-1"
                   >
-                    <FileText size={10} /> 草稿
+                    <Icons.FileText size={10} /> 草稿
                   </button>
                 </div>
               )}
@@ -176,7 +174,7 @@ export const ArchiveDetailPane: React.FC<ArchiveDetailPaneProps> = ({
                   onClick={onRestore}
                   className="w-full py-2 flex items-center justify-center gap-2 bg-[var(--color-base-accent)]/20 text-[var(--color-base-accent)] font-mono text-xs tracking-widest transition-colors"
                 >
-                  <RotateCcw size={14} /> 恢复
+                  <Icons.RotateCcw size={14} /> 恢复
                 </button>
               ) : (
                 <div className="flex gap-2">
@@ -186,14 +184,14 @@ export const ArchiveDetailPane: React.FC<ArchiveDetailPaneProps> = ({
                         onClick={() => setIsEditing(false)}
                         className="flex-1 py-2 flex items-center justify-center gap-1 bg-[var(--color-base-border)] text-[var(--color-base-text-bright)] font-mono text-xs transition-colors"
                       >
-                        <X size={12} /> 取消
+                        <Icons.X size={12} /> 取消
                       </button>
                       <button
                         onClick={onSave}
                         disabled={isSaving}
                         className="flex-1 py-2 flex items-center justify-center gap-1 bg-[var(--color-base-success)] text-[var(--color-base-bg)] font-mono text-xs transition-colors disabled:opacity-50"
                       >
-                        <Check size={12} /> {isSaving ? '保存中' : '保存'}
+                        <Icons.Check size={12} /> {isSaving ? '保存中' : '保存'}
                       </button>
                     </>
                   ) : (
@@ -201,7 +199,7 @@ export const ArchiveDetailPane: React.FC<ArchiveDetailPaneProps> = ({
                       onClick={() => setIsEditing(true)}
                       className="flex-1 py-2 flex items-center justify-center gap-2 bg-[var(--color-base-border)] hover:bg-[var(--color-base-border-highlight)] text-[var(--color-base-text-bright)] font-mono text-xs tracking-widest transition-colors"
                     >
-                      <Edit3 size={14} /> 编辑
+                      <Icons.Edit3 size={14} /> 编辑
                     </button>
                   )}
                 </div>
@@ -213,7 +211,7 @@ export const ArchiveDetailPane: React.FC<ArchiveDetailPaneProps> = ({
                   onClick={onDelete}
                   className="w-full py-2 flex items-center justify-center gap-2 text-[var(--color-base-text)] hover:text-red-400 font-mono text-xs tracking-widest transition-colors"
                 >
-                  <Trash2 size={14} /> 删除
+                  <Icons.Trash size={14} /> 删除
                 </button>
               )}
             </div>

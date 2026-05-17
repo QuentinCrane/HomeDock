@@ -120,7 +120,16 @@ export interface CreateCapsuleParams {
   status?: CapsuleStatus;
 }
 
-// ==================== 胶囊 API ====================
+// Combined initial data fetch - single API call instead of 2 sequential
+export const fetchAll = async () => {
+  const [status, capsules] = await Promise.all([
+    fetchStatus(),
+    fetchCapsules()
+  ]);
+  return { status, capsules };
+};
+
+export {}; // --- 胶囊 API ---
 
 /// 获取胶囊列表
 /// 参数：status(状态过滤)、type(类型过滤)、includeDeleted(包含已删除)
